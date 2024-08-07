@@ -3,7 +3,7 @@ srcdir = "src"
 vulkanSDKpath = os.getenv("VULKAN_SDK")
 
 workspace "Pixelate"
-	configurations { "Debug", "Release" }
+	configurations { "Debug", "Debug_Verbose", "Release" }
 	platforms { "Win64" }
 	startproject "Pixelate"
 	
@@ -38,9 +38,13 @@ project "Pixelate"
 		"SDL2", "SDL2main", "vulkan-1"
 	}
 
-
+	
 	filter "configurations:Debug"
 	defines { "DEBUG" }
+	symbols "On"
+	
+	filter "configurations:Debug_Verbose"
+	defines { "DEBUG", "VERBOSE" }
 	symbols "On"
 
 	filter "configurations:Release"

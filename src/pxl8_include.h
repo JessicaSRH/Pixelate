@@ -12,3 +12,8 @@
 #include "log.h"
 #include "renderer.h"
 
+#ifdef DEBUG
+#define VALIDATION_LAYERS_ENABLED true
+#else
+#define VALIDATION_LAYERS_ENABLED false
+#endif

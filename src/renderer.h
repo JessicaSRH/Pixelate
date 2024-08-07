@@ -6,29 +6,28 @@ namespace Pixelate
 {
 	// Todo:
 	//  Create vkInstance! [x]
+	//  Load validation layers! [x]
 	// 
-	//  Load validation layers!
+	//  Create VkPhysicalDevice and VkDevice!
 	//  Create vkSurface!
 	//  Create vkSwapchain!
-	//  Create vkDevice!
 	//  Create images, pipeline, framebuffers, renderpasses (dynamic rendering? GRAPH?)!
 	//  Create basic shader and compile it into SPIRV
 	//  Create render loop!
 	//  TRIANGLE!
 	// 
 	// Client side todo:
-	//  controls! SDL events! camera (orbit)!
+	//  Orbit camera with control through SDL events if possible
 	//  load gltf models! tiny loader or whatever it is called? reference counting!
 	//  ENTT?
 	// 
 	// Then more core rendering:
 	//  RenderGraph!?
 
-	void LogSDLError(std::string msg);
-
 	struct VulkanContext
 	{
 		VkInstance Instance;
+		VkDebugUtilsMessengerEXT DebugMessenger;
 
 		void Dispose();
 
@@ -48,7 +47,7 @@ namespace Pixelate
 	private:
 
 		SDL_Window* s_window;
-		std::unique_ptr<VulkanContext> s_vulkan;
+		VulkanContext s_vulkan;
 
 	public:
 		void Init();
