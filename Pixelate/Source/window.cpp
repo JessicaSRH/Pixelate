@@ -1,4 +1,4 @@
-#include "pixelate_window.h"
+#include "window.h"
 
 namespace Pixelate
 {

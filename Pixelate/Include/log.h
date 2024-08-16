@@ -18,10 +18,6 @@ namespace Pixelate {
 		static std::shared_ptr<spdlog::logger> s_ClientLogger;
 		static std::shared_ptr<spdlog::logger> s_VulkanValidationLayerLogger;
 	};
-
-	inline void InitializePixelateLog() {
-		Log::Init();
-	}
 }
 
 #define LOG_VULKAN_VALIDATION_WARN(...)  ::Pixelate::Log::GetValidationLayerLogger()->warn(__VA_ARGS__)

@@ -1,4 +1,4 @@
-#include "pixelate_renderer.h"
+#include "renderer.h"
 
 namespace Pixelate
 {
@@ -41,7 +41,7 @@ namespace Pixelate
 		return VK_FALSE;
 	}
 
-	VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
+	static VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 		auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
 		if (func != nullptr) {
 			return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
@@ -74,14 +74,14 @@ namespace Pixelate
 		PXL8_CORE_TRACE("Validation layer debug messenger setup successfully.");
 	}
 
-	void DestroyDebugUtilsMessengerEXT(const VkInstance& instance, VkDebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator) {
+	static void DestroyDebugUtilsMessengerEXT(const VkInstance& instance, VkDebugUtilsMessengerEXT& debugMessenger, const VkAllocationCallbacks* pAllocator) {
 		auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
 		if (func != nullptr) {
 			func(instance, debugMessenger, pAllocator);
 		}
 	}
 
-	static QueueFamilyIndices GetQueueFamilyIndices(const VkPhysicalDevice& physicalDevice)
+	static QueueFamilyIndices GetQueueFamilyIndices(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface = VK_NULL_HANDLE)
 	{
 		uint32_t queueFamilyCount = 0;
 		vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
@@ -100,7 +100,12 @@ namespace Pixelate
 			if (queueFamilyProperties.queueFlags & VK_QUEUE_COMPUTE_BIT)
 				result.ComputeQueueFamily = i;
 
-			// TODO: Check for present support!
+			if (surface != VK_NULL_HANDLE)
+			{
+				VkBool32 presentSupport = false;
+				vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, i, surface, &presentSupport);
+				result.PresentQueueFamily = i;
+			}
 
 			i++;
 		}
@@ -146,8 +151,54 @@ namespace Pixelate
 
 		return rayTracingPipelineSupported;
 	}
+	
+	static SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+	{
+		SwapChainSupportDetails details;
+		vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &details.Capabilities);
 
-	static int ScorePhysicalDevice(const VkPhysicalDevice& physicalDevice)
+		uint32_t formatCount;
+		vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, nullptr);
+
+		if (formatCount != 0)
+		{
+			details.Formats.resize(formatCount);
+			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, details.Formats.data());
+		}
+		else
+		{
+			PXL8_CORE_ERROR("No suported surface formats found on physical device!");
+		}
+
+		uint32_t presentModeCount;
+		vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, nullptr);
+
+		if (presentModeCount != 0)
+		{
+			details.PresentModes.resize(presentModeCount);
+			vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, details.PresentModes.data());
+		}
+		return details;
+	}
+
+	static bool SupportsSwapchain(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, std::vector<VkExtensionProperties> availableExtensions)
+	{
+		auto swapchainExtensionSupported = false;
+		for (const auto& extension : availableExtensions)
+			if (strcmp(extension.extensionName, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0)
+				swapchainExtensionSupported = true;
+
+		bool swapchainAdequate = false;
+		if (swapchainExtensionSupported)
+		{
+			SwapChainSupportDetails swapChainSupport = QuerySwapChainSupport(physicalDevice, surface);
+			swapchainAdequate = !swapChainSupport.Formats.empty() && !swapChainSupport.PresentModes.empty();
+		}
+
+		return swapchainExtensionSupported && swapchainAdequate;
+	}
+
+	static int ScorePhysicalDevice(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
 	{
 		VkPhysicalDeviceProperties deviceProperties;
 		VkPhysicalDeviceFeatures deviceFeatures;
@@ -164,19 +215,20 @@ namespace Pixelate
 		score += deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? 400 : 0;
 		score += deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_CPU ? 300 : 0;
 		score += deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_OTHER ? 200 : 0;
-		score += queueFamilyIndices.GraphicsQueueFamily.has_value() ? 50 : 0;
-		score += queueFamilyIndices.ComputeQueueFamily.has_value() ? 10 : 0;
+		score += queueFamilyIndices.GraphicsQueueFamily.has_value() ? 500 : 0;
+		score += queueFamilyIndices.ComputeQueueFamily.has_value() ? 100 : 0;
 		score += SupportsRayTracing(availableExtensions) ? 1000 : 0;
+		score += SupportsSwapchain(physicalDevice, surface, availableExtensions) ? 1000 : 0;
 
 		return score;
 	}
 
-	static VkPhysicalDevice PickPhysicalDevice(const std::vector<VkPhysicalDevice>& physicalDevices)
+	static VkPhysicalDevice PickPhysicalDevice(VkSurfaceKHR surface, const std::vector<VkPhysicalDevice>& physicalDevices)
 	{
 		std::multimap<int, VkPhysicalDevice> scores{};
 
 		for (const auto& physicalDevice : physicalDevices)
-			scores.insert({ ScorePhysicalDevice(physicalDevice), physicalDevice } );
+			scores.insert({ ScorePhysicalDevice(physicalDevice, surface), physicalDevice } );
 
 		if (scores.size() > 0)
 			return scores.rbegin()->second;
@@ -187,8 +239,9 @@ namespace Pixelate
 	}
 
 	static VkPhysicalDevice CreatePhysicalDevice(
-		const VkInstance& instance,
-		std::function<VkPhysicalDevice(std::vector<VkPhysicalDevice>)> pickDeviceFunction = PickPhysicalDevice)
+		VkInstance instance,
+		VkSurfaceKHR surface,
+		std::function<VkPhysicalDevice(VkSurfaceKHR, std::vector<VkPhysicalDevice>)> pickDeviceFunction = PickPhysicalDevice)
 	{
 		VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
@@ -201,21 +254,21 @@ namespace Pixelate
 		if (physicalDevices.size() == 0)
 			PXL8_CORE_ERROR("Failed to find any GPUs!");
 
-		physicalDevice = pickDeviceFunction(physicalDevices);
+		physicalDevice = pickDeviceFunction(surface, physicalDevices);
 
 		return physicalDevice;
 	}
 
-	static VkPhysicalDevice PickPhysicalDeviceFromProfile(std::vector<VkPhysicalDevice> physicalDevices, VpCapabilities capabilities, VkInstance instance, const VpProfileProperties& profile, VkBool32* supported)
+	static VkPhysicalDevice PickPhysicalDeviceFromProfile(PixelateInstance& context, VkSurfaceKHR surface, std::vector<VkPhysicalDevice> physicalDevices, VkBool32* supported)
 	{
 		std::multimap<int, VkPhysicalDevice> scores{};
 
 		for (const auto& physicalDevice : physicalDevices)
-			scores.insert({ ScorePhysicalDevice(physicalDevice), physicalDevice });
+			scores.insert({ ScorePhysicalDevice(physicalDevice, surface), physicalDevice });
 
 		for (const auto& [score, physicalDevice] : std::ranges::reverse_view(scores))
 		{
-			auto result = vpGetPhysicalDeviceProfileSupport(capabilities, instance, physicalDevice, &profile, supported);
+			auto result = vpGetPhysicalDeviceProfileSupport(context.ProfileCapabilities, context.Instance, physicalDevice, &context.ProfileProperties, supported);
 			if (result != VK_SUCCESS)
 				PXL8_CORE_ERROR("Failed to query device profile support!");
 			
@@ -223,7 +276,7 @@ namespace Pixelate
 				return physicalDevice;
 		}
 
-		auto profileName = &profile.profileName[0];
+		auto profileName = &context.ProfileProperties.profileName[0];
 
 		PXL8_CORE_ERROR(std::string("No suitable GPU found for Vulkan profile: ") + profileName);
 
@@ -232,19 +285,19 @@ namespace Pixelate
 
 	static VpCapabilities GetVpCapabilities()
 	{
-		VpCapabilities capabilities = VK_NULL_HANDLE;
+		VpCapabilities Capabilities = VK_NULL_HANDLE;
 
 		VpCapabilitiesCreateInfo createInfo;
 		createInfo.apiVersion = VK_API_VERSION_1_3;
 		createInfo.flags = VP_PROFILE_CREATE_STATIC_BIT;
 		createInfo.pVulkanFunctions = nullptr;
 
-		auto result = vpCreateCapabilities(&createInfo, nullptr, &capabilities);
+		auto result = vpCreateCapabilities(&createInfo, nullptr, &Capabilities);
 
 		if (result != VK_SUCCESS)
 			PXL8_CORE_ERROR("Failed to set Vulkan Profiles Toolset capabilities!");
 
-		return capabilities;
+		return Capabilities;
 	}
 
 	static bool CheckInstanceLayerSupport(std::vector<const char*>& layers)
@@ -290,7 +343,7 @@ namespace Pixelate
 		return allSupported;
 	}
 
-	static VkDevice CreateLogicalDevice(VkPhysicalDevice physicalDevice, const Pixelate::QueueFamilyIndices& queueFamilyIndices, VpCapabilities capabilities, const VpProfileProperties& profile)
+	static VkDevice CreateLogicalDevice(VkPhysicalDevice physicalDevice, const Pixelate::QueueFamilyIndices& queueFamilyIndices, VpCapabilities Capabilities, const VpProfileProperties& profile)
 	{
 		std::vector<VkDeviceQueueCreateInfo> deviceQueueCreateInfos{};
 
@@ -314,9 +367,13 @@ namespace Pixelate
 			deviceQueueCreateInfos.push_back(computeQueueCreateInfo);
 		}
 
+		std::vector<const char*> additionaDeviceExtensions{ VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
 		VkDeviceCreateInfo deviceCreateInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
 		deviceCreateInfo.queueCreateInfoCount = static_cast<uint32_t>(deviceQueueCreateInfos.size());
 		deviceCreateInfo.pQueueCreateInfos = deviceQueueCreateInfos.data();
+		deviceCreateInfo.enabledExtensionCount = static_cast<uint32_t>(additionaDeviceExtensions.size());
+		deviceCreateInfo.ppEnabledExtensionNames = additionaDeviceExtensions.data();
 
 		VpDeviceCreateInfo vpCreateInfo{};
 		vpCreateInfo.pCreateInfo = &deviceCreateInfo;
@@ -324,7 +381,7 @@ namespace Pixelate
 		vpCreateInfo.pEnabledFullProfiles = &profile;
 
 		VkDevice device = VK_NULL_HANDLE;
-		auto result = vpCreateDevice(capabilities, physicalDevice, &vpCreateInfo, nullptr, &device);
+		auto result = vpCreateDevice(Capabilities, physicalDevice, &vpCreateInfo, nullptr, &device);
 		if (result != VK_SUCCESS)
 			PXL8_CORE_ERROR("Failed to create logical device!");
 
@@ -333,17 +390,26 @@ namespace Pixelate
 		return device;
 	}
 
-	static VulkanContext VulkanProfileBootstrap(const char* applicationName, const char* profileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION, unsigned int minApiVersion = VP_KHR_ROADMAP_2022_MIN_API_VERSION)
+	static VpProfileProperties GetProfileProperties(const char* profileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION)
 	{
-		auto capabilities = GetVpCapabilities();
-
-		VkResult result;
-		VkBool32 supported = VK_FALSE;
 		VpProfileProperties profile{};
 
 		profile.specVersion = profileSpecVersion;
 		strncpy_s(profile.profileName, profileName, strlen(profileName));
-		
+
+		return profile;
+	}
+
+	static PixelateInstance VulkanProfileBootstrap(const char* applicationName, const char* profileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION, unsigned int minApiVersion = VP_KHR_ROADMAP_2022_MIN_API_VERSION)
+	{
+		Log::Init();
+
+		auto capabilities = GetVpCapabilities();
+
+		VkResult result;
+		VkBool32 supported = VK_FALSE;
+		auto profile = GetProfileProperties();
+
 		result = vpGetInstanceProfileSupport(capabilities, nullptr, &profile, &supported);
 		if (result != VK_SUCCESS)
 			PXL8_CORE_ERROR("Failed to assess Vulkan profile support!");
@@ -402,59 +468,297 @@ namespace Pixelate
 		result = vpCreateInstance(capabilities, &vpCreateInfo, nullptr, &instance);
 		ValidateVulkanInstance(result);
 		
-		auto physicalDevice = CreatePhysicalDevice(
-			instance,
-			[capabilities, instance, profile, &supported](const std::vector<VkPhysicalDevice>& physicalDevices) -> VkPhysicalDevice
-			{
-				return PickPhysicalDeviceFromProfile(physicalDevices, capabilities, instance, profile, &supported);
-			});
-
-		VulkanContext context{};
-		context.Instance = instance;
-		context.Device.VkPhysicalDevice = physicalDevice;
+		PixelateInstance context{ instance, profile, capabilities };
 		CreateDebugMessenger(instance, &context.DebugMessenger);
-		context.Device.QueueFamilyIndices = GetQueueFamilyIndices(physicalDevice);
-		context.Device.VkDevice = CreateLogicalDevice(physicalDevice, context.Device.QueueFamilyIndices, capabilities, profile);
-
-		PXL8_CORE_INFO(std::string("Vulkan device created from profile successfully:"));
-		PXL8_CORE_INFO(std::string("    ") + profileName);
-		PXL8_CORE_INFO(std::string("    Profile Version: ") + std::to_string(profileSpecVersion));
 
 		return context;
 	}
 
-	PixelateSurface CreateSurface(VkInstance instance, const char* applicationName, int x, int y, int width, int height)
+	static PixelateDevice CreatePixelateDevice(PixelateInstance& context, VkSurfaceKHR surface)
 	{
-		PixelateSurface surface{ width, height, InitializeSDLWindow(applicationName, x, y, width, height) };
+		VkBool32 supported = VK_FALSE;
 
-		auto success = SDL_Vulkan_CreateSurface(surface.Window, instance, &surface.VkSurfaceKHR);
+		auto physicalDevice = CreatePhysicalDevice(
+			context.Instance,
+			surface,
+			[&context, &supported](VkSurfaceKHR surface, const std::vector<VkPhysicalDevice>& physicalDevices) -> VkPhysicalDevice
+			{
+				return PickPhysicalDeviceFromProfile(context, surface, physicalDevices, &supported);
+			});
+
+		PixelateDevice device;
+		device.VkPhysicalDevice = physicalDevice;
+		device.QueueFamilyIndices = GetQueueFamilyIndices(physicalDevice);
+		device.VkDevice = CreateLogicalDevice(physicalDevice, device.QueueFamilyIndices, context.ProfileCapabilities, context.ProfileProperties);
+
+		PXL8_CORE_INFO(std::string("Vulkan device created from profile successfully:"));
+		PXL8_CORE_INFO(std::string("    ") + context.ProfileProperties.profileName);
+		PXL8_CORE_INFO(std::string("    Profile Version: ") + std::to_string(context.ProfileProperties.specVersion));
+
+		return device;
+	}
+
+	static VkSurfaceFormatKHR ChooseSwapchainSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats)
+	{
+		for (const auto& availableFormat : availableFormats)
+		{
+			if (availableFormat.format == PREFERRED_SWAPCHAIN_IMAGE_FORMAT && availableFormat.colorSpace == PREFERRED_SWAPCHAIN_COLOR_SPACE)
+			{
+				return availableFormat;
+			}
+		}
+
+		return availableFormats[0];
+	}
+
+	static VkPresentModeKHR ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availablePresentModes)
+	{
+		for (const auto& availablePresentMode : availablePresentModes)
+		{
+			if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+			{
+				return availablePresentMode;
+			}
+		}
+
+		return VK_PRESENT_MODE_FIFO_KHR; // support guaranteed
+	}
+
+	static VkExtent2D ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& Capabilities, SDL_Window* window)
+	{
+		if (Capabilities.currentExtent.width != UINT32_MAX)
+		{
+			return Capabilities.currentExtent;
+		}
+		else
+		{
+			int width, height;
+			SDL_Vulkan_GetDrawableSize(window, &width, &height);
+
+			VkExtent2D actualExtent = {
+				static_cast<uint32_t>(width),
+				static_cast<uint32_t>(height)
+			};
+
+			actualExtent.width = std::max(Capabilities.minImageExtent.width, std::min(Capabilities.maxImageExtent.width, actualExtent.width));
+			actualExtent.height = std::max(Capabilities.minImageExtent.height, std::min(Capabilities.maxImageExtent.height, actualExtent.height));
+
+			return actualExtent;
+		}
+	}
+
+	static void ValidateSwapchainCreation(VkResult result)
+	{
+		switch (result)
+		{
+		case VK_SUCCESS:
+			PXL8_CORE_TRACE("Swapchain created succesfully.");
+			break;
+		case VK_SUBOPTIMAL_KHR:
+			PXL8_CORE_WARN("Swapchain is suboptimal.");
+			break;
+		default:
+			PXL8_CORE_ERROR("Failed to create swapchain.");
+		}
+	}
+
+	PixelateSwapchain::PixelateSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, SDL_Window* window) :
+		SupportDetails(QuerySwapChainSupport(physicalDevice, surface)),
+		SurfaceFormat(ChooseSwapchainSurfaceFormat(SupportDetails.Formats)),
+		PresentMode(ChooseSwapchainPresentMode(SupportDetails.PresentModes)),
+		Extent(ChooseSwapchainExtent(SupportDetails.Capabilities, window)),
+		VkSwapchain(VK_NULL_HANDLE),
+		m_Device(device),
+		m_PhysicalDevice(physicalDevice),
+		m_Surface(surface)
+	{
+		Recreate();
+	}
+
+	void PixelateSwapchain::Dispose()
+	{
+		DisposeImageViews();
+		vkDestroySwapchainKHR(m_Device, VkSwapchain, nullptr);
+	}
+
+	void PixelateSwapchain::DisposeImageViews()
+	{
+		for (auto imageView : SwapchainImageViews)
+			vkDestroyImageView(m_Device, imageView, nullptr);
+
+		SwapchainImageViews.clear();
+	}
+
+	void PixelateSwapchain::Recreate()
+	{
+		DisposeImageViews();
+
+		uint32_t imageCount = std::clamp((uint32_t)3, (uint32_t)SupportDetails.Capabilities.minImageCount, (uint32_t)SupportDetails.Capabilities.maxImageCount);
+
+		VkSwapchainCreateInfoKHR swapchainCreateInfo{};
+		swapchainCreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+		swapchainCreateInfo.surface = m_Surface;
+		swapchainCreateInfo.minImageCount = imageCount;
+		swapchainCreateInfo.imageFormat = SurfaceFormat.format;
+		swapchainCreateInfo.imageColorSpace = SurfaceFormat.colorSpace;
+		swapchainCreateInfo.imageExtent = Extent;
+		swapchainCreateInfo.imageArrayLayers = 1;
+		swapchainCreateInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		swapchainCreateInfo.preTransform = SupportDetails.Capabilities.currentTransform;
+		swapchainCreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+		swapchainCreateInfo.presentMode = PresentMode;
+		swapchainCreateInfo.clipped = VK_TRUE;
+		swapchainCreateInfo.oldSwapchain = VkSwapchain;
+
+		QueueFamilyIndices indices = GetQueueFamilyIndices(m_PhysicalDevice, m_Surface);
+		uint32_t queueFamilyIndices[] = { indices.GraphicsQueueFamily.value(), indices.PresentQueueFamily.value() };
+
+		if (indices.GraphicsQueueFamily != indices.PresentQueueFamily)
+		{
+			swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+			swapchainCreateInfo.queueFamilyIndexCount = 2;
+			swapchainCreateInfo.pQueueFamilyIndices = queueFamilyIndices;
+		}
+		else
+		{
+			swapchainCreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+			swapchainCreateInfo.queueFamilyIndexCount = 0; // Optional
+			swapchainCreateInfo.pQueueFamilyIndices = nullptr; // Optional
+		}
+
+		ValidateSwapchainCreation(vkCreateSwapchainKHR(m_Device, &swapchainCreateInfo, nullptr, &VkSwapchain));
+
+		uint32_t actualImageCount{};
+		vkGetSwapchainImagesKHR(m_Device, VkSwapchain, &actualImageCount, nullptr);
+
+		SwapchainImages.resize(actualImageCount);
+		vkGetSwapchainImagesKHR(m_Device, VkSwapchain, &actualImageCount, SwapchainImages.data());
+
+		SwapchainImageViews.resize(SwapchainImages.size());
+		for (auto i = 0; i < actualImageCount; i++)
+		{
+			VkImageViewCreateInfo createInfo{};
+			createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+			createInfo.format = SurfaceFormat.format;
+			createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+			createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			createInfo.subresourceRange.baseMipLevel = 0;
+			createInfo.subresourceRange.levelCount = 1;
+			createInfo.subresourceRange.baseArrayLayer = 0;
+			createInfo.subresourceRange.layerCount = 1;
+			createInfo.image = SwapchainImages[0];
+
+			if (vkCreateImageView(m_Device, &createInfo, nullptr, &SwapchainImageViews[i]) != VK_SUCCESS)
+				PXL8_CORE_ERROR("Failed to create swapchain image views!");
+			else
+				PXL8_CORE_TRACE(std::string("Swapchain image view ") + std::to_string(i) + " created successfully.");
+		}
+	}
+
+	PixelatePresentationEngine CreateSurface(VkInstance instance, const char* applicationName, int x, int y, int width, int height)
+	{
+		VkSurfaceKHR surface;
+		auto window = InitializeSDLWindow(applicationName, x, y, width, height);
+		auto success = SDL_Vulkan_CreateSurface(window, instance, &surface);
 
 		if (!success)
 			LogSDLError("SDL2 surface creation failed: ");
 		else
 			PXL8_CORE_INFO(std::string("Surface \"") + applicationName + "\" created successfully.");
 
-		return surface;
+		PixelatePresentationEngine presentationEngine(width, height, window, surface);
+
+		return presentationEngine;
 	}
 
 	Renderer::Renderer(const char* applicationName, int x, int y, int width, int height, const char* vulkanProfileName, const int profileSpecVersion, unsigned int minApiVersion) :
-		m_Vulkan(VulkanProfileBootstrap(applicationName, vulkanProfileName, profileSpecVersion, minApiVersion)),
-		m_Surface(CreateSurface(m_Vulkan.Instance, applicationName, x, y, width, height))
+		m_Instance(VulkanProfileBootstrap(applicationName, vulkanProfileName, profileSpecVersion, minApiVersion)),
+		m_Presentation(CreateSurface(m_Instance.Instance, applicationName, x, y, width, height)),
+		m_Device(CreatePixelateDevice(m_Instance, m_Presentation.GetSurface())),
+		m_VulkanResourceManager(VulkanResourceManager(m_Instance.Instance, m_Device.VkDevice, m_Device.VkPhysicalDevice, minApiVersion))
 	{
+		m_Presentation.InitializeSwapchain(m_Device.VkDevice, m_Device.VkPhysicalDevice);
+	}
+
+	void Renderer::Render(std::function<bool()> inputHandler)
+	{
+		auto quit = false;
+		while (!quit)
+		{
+			quit = inputHandler();
+
+			// wait for frame-in-flight fence
+			// acquire swapchain image and associated semaphore
+			// record command buffers
+			// submit command buffers with swapchain -> assign frame-in-flight fence
+
+			m_FrameInFlightIndex++;
+		}
+	}
+
+	const SDL_Window* Renderer::GetWindow() const
+	{
+		return m_Presentation.GetWindow();
 	}
 
 	Renderer::~Renderer()
 	{
-		if (m_Vulkan.Instance == VK_NULL_HANDLE)
+		if (m_Instance.Instance == VK_NULL_HANDLE)
 			return; // is disposed already
 
-		vkDestroySurfaceKHR(m_Vulkan.Instance, m_Surface.VkSurfaceKHR, nullptr);
-		vkDestroyDevice(m_Vulkan.Device.VkDevice, nullptr);
-		DestroySDLWindow(m_Surface.Window);
-		DestroyDebugUtilsMessengerEXT(m_Vulkan.Instance, m_Vulkan.DebugMessenger, 0);
-		vkDestroyInstance(m_Vulkan.Instance, 0);
+		m_Presentation.Dispose(m_Instance.Instance);
+		vkDestroyDevice(m_Device.VkDevice, nullptr);
+		DestroyDebugUtilsMessengerEXT(m_Instance.Instance, m_Instance.DebugMessenger, 0);
+		vkDestroyInstance(m_Instance.Instance, 0);
 
 		PXL8_CORE_TRACE("Renderer disposed successfully.");
+	}
+
+	PixelatePresentationEngine::PixelatePresentationEngine(int width, int height, SDL_Window* window, VkSurfaceKHR surface)
+		: m_Width(width), m_Height(height), m_Window(window), m_VkSurfaceKHR(surface), m_Swapchain()
+	{
+	}
+
+	void PixelatePresentationEngine::InitializeSwapchain(VkDevice device, VkPhysicalDevice physicalDevice)
+	{
+		m_Swapchain = PixelateSwapchain(device, physicalDevice, m_VkSurfaceKHR, m_Window);
+	}
+
+	void PixelatePresentationEngine::Dispose(VkInstance instance)
+	{
+		m_Swapchain.Dispose();
+		vkDestroySurfaceKHR(instance, m_VkSurfaceKHR, nullptr);
+		DestroySDLWindow(m_Window);
+	}
+
+	FenceGroup& FenceManager::GetFenceGroup(FenceIdenfitier descriptor, uint32_t groupSize)
+	{
+		if (m_Fences.find(descriptor) == m_Fences.end())
+		{
+			m_Fences.emplace(descriptor, FenceGroup(m_Device, groupSize));
+		}
+
+		return m_Fences.at(descriptor);
+	}
+
+	FenceGroup::FenceGroup(VkDevice device, uint32_t size) : m_Device(device)
+	{
+		m_VkFences.resize(size);
+		for (auto i = 0; i < size; i++)
+		{
+			VkFenceCreateInfo createInfo{};
+			createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+			createInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+			vkCreateFence(device, &createInfo, nullptr, &m_VkFences[i]);
+		}
+	}
+	FenceManager::FenceManager(VkDevice device) : m_Device(device)
+	{
 	}
 }
 

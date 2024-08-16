@@ -5,10 +5,15 @@
 #include <cstdlib>
 #include <functional>
 #include <ranges>
+#include <memory>
+#include <limits>
 
-#include "pixelate_log.h"
-#include "pixelate_window.h"
-#include "pixelate_renderer.h"
+#include "log.h"
+#include "vma_usage.h"
+#include "window.h"
+#include "resource_manager.h"
+#include "renderer.h"
+
 
 #ifdef DEBUG
 constexpr bool VALIDATION_LAYERS_ENABLED = true;
@@ -28,8 +33,9 @@ constexpr Platform PLATFORM = Platform::Win64;
 //  Load validation layers! [x]
 //  Create VkPhysicalDevice and VkDevice! [x]
 //  Create vkSurface! [x]
+//  Create vkSwapchain! [x]
 // 
-//  Create vkSwapchain!
+//  Create render loop + presentation
 //  Create images, pipeline, framebuffers, renderpasses (dynamic rendering? GRAPH?)!
 //  Create basic shader and compile it into SPIRV
 //  Create render loop!
