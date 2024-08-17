@@ -3,12 +3,16 @@
 #include "resource_manager.h"
 #include "pixelate_include.h"
 
-namespace Pixelate
+namespace PixelateSettings
 {
-	// Swapchain
-
 	constexpr VkFormat PREFERRED_SWAPCHAIN_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
 	constexpr VkColorSpaceKHR PREFERRED_SWAPCHAIN_COLOR_SPACE = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
+}
+
+namespace Pixelate
+{
+	// Device
 
 	struct QueueFamilyIndices
 	{
@@ -24,6 +28,10 @@ namespace Pixelate
 		VkPhysicalDevice VkPhysicalDevice;
 		QueueFamilyIndices QueueFamilyIndices;
 	};
+}
+#include "command_buffer_manager.h"
+namespace Pixelate {
+	// Swapchain
 
 	struct SwapChainSupportDetails
 	{
@@ -44,14 +52,13 @@ namespace Pixelate
 		std::vector<VkImageView> SwapchainImageViews;
 	public:
 		PixelateSwapchain() { }
-		PixelateSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, SDL_Window* window);
+		PixelateSwapchain(PixelateDevice device, VkSurfaceKHR surface, SDL_Window* window);
 		void Dispose();
 		void Recreate();
 	private :
 		void DisposeImageViews();
 	private:
-		VkDevice m_Device;
-		VkPhysicalDevice m_PhysicalDevice;
+		PixelateDevice m_Device;
 		VkSurfaceKHR m_Surface;
 
 	};
@@ -68,7 +75,9 @@ namespace Pixelate
 
 	public:
 		PixelatePresentationEngine(int width, int height, SDL_Window* window, VkSurfaceKHR surface);
-		void InitializeSwapchain(VkDevice device, VkPhysicalDevice physicalDevice);
+		void Initialize(PixelateDevice device);
+		std::tuple<VkImage, VkImageView> AcquireSwapcahinImage(VkSemaphore signalSemaphore = VK_NULL_HANDLE, VkFence signalFence = VK_NULL_HANDLE);
+		void Present(uint32_t index, VkSemaphore waitSemaphore = VK_NULL_HANDLE, VkImageLayout previousLayout = VK_IMAGE_LAYOUT_UNDEFINED, VkFence signalFence = VK_NULL_HANDLE);
 		void Dispose(VkInstance instance);
 
 	private:
@@ -76,7 +85,9 @@ namespace Pixelate
 		int m_Height;
 		SDL_Window* m_Window;
 		VkSurfaceKHR m_VkSurfaceKHR;
+		PixelateDevice m_Device;
 		PixelateSwapchain m_Swapchain;
+		VkQueue m_PresentQueue;
 	};
 
 	// Instance
@@ -95,32 +106,70 @@ namespace Pixelate
 
 	// Fences
 
+	enum class FenceIdenfitier : uint32_t
+	{
+		FrameHasBeenPresented = 1
+	};
+
+	struct FenceGroupDescriptor
+	{
+		FenceIdenfitier Identifier = FenceIdenfitier::FrameHasBeenPresented;
+		uint32_t FenceCount = 1;
+		VkFenceCreateFlags CreateFlags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+		uint64_t Hash() const;
+	};
+
 	class FenceGroup
 	{
 	public:
-		FenceGroup(VkDevice device, uint32_t size);
-		void AddFencedCallback(uint32_t subindex = std::numeric_limits<uint32_t>::max());
-		void Wait(uint32_t subindex = std::numeric_limits<uint32_t>::max());
+		FenceGroup(VkDevice device, const FenceGroupDescriptor& descriptor);
+		void AddFencedCallback(std::function<void()> callback, uint32_t index = std::numeric_limits<uint32_t>::max());
+		void Wait(uint32_t index = std::numeric_limits<uint32_t>::max(), uint64_t timeout = std::numeric_limits<uint64_t>::max());
+		void Dispose();
 
 	private:
-		void Reset(uint32_t subindex = std::numeric_limits<uint32_t>::max());
 		std::vector<VkFence> m_VkFences;
+		std::unordered_map<uint32_t, std::vector<std::function<void()>>> m_IndexedCallbacks;
 		VkDevice m_Device;
-	};
-
-	enum class FenceIdenfitier : uint32_t
-	{
-		FrameInFlight = 1
 	};
 
 	class FenceManager
 	{
 	public:
 		FenceManager(VkDevice device);
-		FenceGroup& GetFenceGroup(FenceIdenfitier descriptor, uint32_t groupSize = 1);
+		FenceGroup& GetFenceGroup(const FenceGroupDescriptor& descriptor);
+		void Dispose();
 
 	private:
-		std::unordered_map<FenceIdenfitier, FenceGroup> m_Fences;
+		std::unordered_map<uint64_t, FenceGroup> m_FenceGroups;
+		VkDevice m_Device;
+	};
+
+	// Semaphores
+
+	enum class SemaphoreIdentifier : uint32_t
+	{
+		ImageHasBeenAcquired
+	};
+
+	struct SemaphoreGroupDescriptor
+	{
+		SemaphoreIdentifier Identifier = SemaphoreIdentifier::ImageHasBeenAcquired;
+		uint32_t SemaphoreCount = 1;
+
+		uint64_t Hash() const;
+	};
+
+	class SemaphoreManager
+	{
+	public:
+		SemaphoreManager(VkDevice device);
+		std::vector<VkSemaphore>& GetSemaphoreGroup(const SemaphoreGroupDescriptor& descriptor);
+		void Dispose();
+
+	private:
+		std::unordered_map<uint64_t, std::vector<VkSemaphore>> m_SemaphoreGroups;
 		VkDevice m_Device;
 	};
 
@@ -143,6 +192,8 @@ namespace Pixelate
 		PixelatePresentationEngine m_Presentation;
 		PixelateDevice m_Device;
 		VulkanResourceManager m_VulkanResourceManager;
+		FenceManager m_FenceManager;
+		SemaphoreManager m_SemaphoreManager;
 		uint32_t m_FrameInFlightIndex = 0;
 	};
 }

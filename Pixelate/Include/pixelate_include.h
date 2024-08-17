@@ -7,7 +7,14 @@
 #include <ranges>
 #include <memory>
 #include <limits>
+#include <tuple>
+#include <thread>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
 
+#include "thread_safe_fifo_queue.h"
+#include "hasher.h"
 #include "log.h"
 #include "vma_usage.h"
 #include "window.h"
