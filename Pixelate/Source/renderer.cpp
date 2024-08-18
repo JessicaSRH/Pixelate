@@ -681,9 +681,7 @@ namespace Pixelate
 		m_Instance(VulkanProfileBootstrap(applicationName, vulkanProfileName, profileSpecVersion, minApiVersion)),
 		m_Presentation(CreateSurface(m_Instance.Instance, applicationName, x, y, width, height)),
 		m_Device(CreatePixelateDevice(m_Instance, m_Presentation.GetSurface())),
-		m_VulkanResourceManager(VulkanResourceManager(m_Instance.Instance, m_Device.VkDevice, m_Device.VkPhysicalDevice, minApiVersion)),
-		m_FenceManager(FenceManager(m_Device.VkDevice)),
-		m_SemaphoreManager(SemaphoreManager(m_Device.VkDevice))
+		m_VulkanResourceManager(VulkanResourceManager(m_Instance.Instance, m_Device.VkDevice, m_Device.VkPhysicalDevice, minApiVersion))
 	{
 		m_Presentation.Initialize(m_Device);
 	}
@@ -695,29 +693,33 @@ namespace Pixelate
 		{
 			quit = inputHandler();
 
-			auto presentationFences = m_FenceManager.GetFenceGroup(
+			auto presentationFences = FenceManager::GetFenceGroup(
+				m_Device.VkDevice,
+				FenceGroupDescriptor
 				{
-					FenceIdenfitier::FrameHasBeenPresented,
-					PixelateSettings::MAX_FRAMES_IN_FLIGHT,
-					VK_FENCE_CREATE_SIGNALED_BIT
+					.Identifier = FenceIdenfitier::FrameHasBeenPresented,
+					.FenceGroupSize = PixelateSettings::MAX_FRAMES_IN_FLIGHT,
+					.CreateFlags = VK_FENCE_CREATE_SIGNALED_BIT
 				});
 
 			presentationFences.Wait(m_FrameInFlightIndex);
 
-			auto acquireSwapchainImageSemaphore = m_SemaphoreManager.GetSemaphoreGroup(
-		{
-					SemaphoreIdentifier::ImageHasBeenAcquired,
-					PixelateSettings::MAX_FRAMES_IN_FLIGHT,
+			auto acquireSwapchainImageSemaphore = SemaphoreManager::GetSemaphore(
+				m_Device.VkDevice,
+				VK_PIPELINE_STAGE_2_NONE,
+				SemaphoreDescriptor{
+					SemaphoreIdentifier::SwapchainImageHasBeenAcquired,
+					m_FrameInFlightIndex,
 				});
 
-			auto [swapchainImage, swapchainImageView] = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore[m_FrameInFlightIndex]);
+			auto [swapchainImageIndex, swapchainImageView] = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
 
 			// record command buffers that render (or copy/blit) to swapchain image
 			// submit command buffers to graphics queue
 				// - assign frame-in-flight fence to be signaled on completion
 				// - assign frame-in-flight semaphore to be signaled on completion
 
-			m_Presentation.Present(m_FrameInFlightIndex);
+			m_Presentation.Present(swapchainImageIndex, PixelateSemaphore());
 
 			m_FrameInFlightIndex = (m_FrameInFlightIndex + 1) % PixelateSettings::MAX_FRAMES_IN_FLIGHT;
 		}
@@ -733,8 +735,8 @@ namespace Pixelate
 		if (m_Instance.Instance == VK_NULL_HANDLE)
 			return; // is disposed already
 
-		m_FenceManager.Dispose();
-		m_SemaphoreManager.Dispose();
+		FenceManager::Dispose();
+		SemaphoreManager::Dispose(m_Device.VkDevice);
 		m_Presentation.Dispose(m_Instance.Instance);
 		vkDestroyDevice(m_Device.VkDevice, nullptr);
 		DestroyDebugUtilsMessengerEXT(m_Instance.Instance, m_Instance.DebugMessenger, 0);
@@ -759,12 +761,12 @@ namespace Pixelate
 		m_Swapchain = PixelateSwapchain(device, m_VkSurfaceKHR, m_Window);
 	}
 
-	std::tuple<VkImage, VkImageView> PixelatePresentationEngine::AcquireSwapcahinImage(VkSemaphore signalSemaphore, VkFence signalFence)
+	std::tuple<uint32_t, VkImageView> PixelatePresentationEngine::AcquireSwapcahinImage(VkSemaphore signalSemaphore, VkFence signalFence)
 	{
 		uint32_t imageIndex{};
 		auto result = vkAcquireNextImageKHR(m_Device.VkDevice, m_Swapchain.VkSwapchain, std::numeric_limits<uint64_t>::max(), signalSemaphore, signalFence, &imageIndex);
 
-		return { m_Swapchain.SwapchainImages[imageIndex], m_Swapchain.SwapchainImageViews[imageIndex]};
+		return { imageIndex, m_Swapchain.SwapchainImageViews[imageIndex]};
 	}
 
 	void ValidateSwapchainResult(VkResult result)
@@ -782,26 +784,90 @@ namespace Pixelate
 			PXL8_APP_WARN("Unknown error during present queue submission!");
 	}
 
-	void PixelatePresentationEngine::Present(uint32_t index, VkSemaphore waitSemaphore, VkImageLayout previousLayout, VkFence signalFence)
+	void PixelatePresentationEngine::TransitionImageLayout(
+		uint32_t swapchainImageIndex,
+		PixelateSemaphore signalSemaphore,
+		VkImageLayout newLayout,
+		VkImageLayout oldLayout)
+	{
+
+
+		VkImageMemoryBarrier2 barrier{};
+		barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
+		barrier.oldLayout = oldLayout;
+		barrier.newLayout = newLayout;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.image = m_Swapchain.SwapchainImages[swapchainImageIndex];
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseMipLevel = 0;
+		barrier.subresourceRange.levelCount = 1;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+
+		barrier.srcStageMask = VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT;
+		barrier.srcAccessMask = 0;
+		barrier.dstStageMask = VK_PIPELINE_STAGE_2_NONE_KHR;
+		barrier.dstAccessMask = 0;
+
+		VkDependencyInfo dependencyInfo{};
+		dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+		dependencyInfo.imageMemoryBarrierCount = 1;
+		dependencyInfo.pImageMemoryBarriers = &barrier;
+
+		auto signalSemaphoreSubmitInfo = (VkSemaphoreSubmitInfo)signalSemaphore;
+
+		auto fenceGroup = FenceManager::GetFenceGroup(
+			m_Device.VkDevice,
+			FenceGroupDescriptor
+			{
+				.Identifier = FenceIdenfitier::SwapchainLayoutTransition,
+				.FenceGroupSize = static_cast<uint32_t>(m_Swapchain.SwapchainImages.size()),
+			});
+
+		auto commandBuffer = CommandBufferManager::GetCommandBuffer(m_Device);
+		vkCmdPipelineBarrier2(commandBuffer, &dependencyInfo);
+		fenceGroup.AddFencedCallback([commandBuffer]() mutable { commandBuffer.Return(); }, swapchainImageIndex);
+
+		QueueManager::GraphicsQueueSubmit(
+			m_Device,
+			GraphicsQueueSubmitDescriptor{ GraphicsQueueType::Default },
+			commandBuffer.CommandBuffer,
+			fenceGroup[swapchainImageIndex],
+			&signalSemaphoreSubmitInfo, 1,
+			nullptr, 0
+			);
+	}
+
+	void PixelatePresentationEngine::Present(
+		uint32_t swapchainImageIndex,
+		PixelateSemaphore waitSemaphore,
+		VkImageLayout previousLayout)
 	{
 		VkPresentInfoKHR presentInfo{};
 		presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-		presentInfo.waitSemaphoreCount = 0;
-		presentInfo.pWaitSemaphores = NULL;
 		presentInfo.swapchainCount = 1;
 		presentInfo.pSwapchains = &m_Swapchain.VkSwapchain;
-		presentInfo.pImageIndices = &index;
+		presentInfo.pImageIndices = &swapchainImageIndex;
 
-		VkSwapchainPresentFenceInfoEXT swapchainFenceInfo{};
-		if (signalFence != VK_NULL_HANDLE)
+		std::vector<VkSemaphore> waitSemaphores{ waitSemaphore };
+
+		if (!(previousLayout & (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR | VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR)))
 		{
-			swapchainFenceInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_PRESENT_FENCE_INFO_EXT;
-			swapchainFenceInfo.swapchainCount = 1;
-			swapchainFenceInfo.pFences = &signalFence;
-			presentInfo.pNext = &swapchainFenceInfo;
+			auto imageTransitionSemaphore = SemaphoreManager::GetSemaphore(
+				m_Device.VkDevice,
+				VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
+				SemaphoreDescriptor
+				{
+					.Identifier = SemaphoreIdentifier::SwapchainImageTransitionToPresent,
+					.Index = swapchainImageIndex
+				});
+			waitSemaphores.push_back(imageTransitionSemaphore);
+			TransitionImageLayout(swapchainImageIndex, imageTransitionSemaphore);
 		}
 
-		auto commandBuffer = CommandBufferManager::GetCommandBuffer(m_Device, CommandBufferDescriptor());
+		presentInfo.waitSemaphoreCount = waitSemaphores.size();
+		presentInfo.pWaitSemaphores = waitSemaphores.data();
 
 		ValidateSwapchainResult(vkQueuePresentKHR(m_PresentQueue, &presentInfo));
 	}
@@ -811,136 +877,6 @@ namespace Pixelate
 		m_Swapchain.Dispose();
 		vkDestroySurfaceKHR(instance, m_VkSurfaceKHR, nullptr);
 		DestroySDLWindow(m_Window);
-	}
-
-	//Fences
-
-	FenceManager::FenceManager(VkDevice device) : m_Device(device)
-	{
-	}
-
-	FenceGroup& FenceManager::GetFenceGroup(const FenceGroupDescriptor& descriptor)
-	{
-		auto hash = descriptor.Hash();
-
-		if (m_FenceGroups.find(hash) == m_FenceGroups.end())
-			m_FenceGroups.emplace(std::make_pair(hash, FenceGroup(m_Device, descriptor)));
-
-		return m_FenceGroups.at(hash);
-	}
-
-	void FenceManager::Dispose()
-	{
-		for (auto& [descriptor, fenceGroup] : m_FenceGroups)
-			fenceGroup.Dispose();
-	}
-
-	FenceGroup::FenceGroup(VkDevice device, const FenceGroupDescriptor& descriptor) : m_Device(device)
-	{
-		m_VkFences.resize(descriptor.FenceCount);
-		for (auto i = 0; i < descriptor.FenceCount; i++)
-		{
-			VkFenceCreateInfo createInfo{};
-			createInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-			createInfo.flags = descriptor.CreateFlags;
-
-			auto result = vkCreateFence(device, &createInfo, nullptr, &m_VkFences[i]);
-
-			if (result != VK_SUCCESS)
-				PXL8_CORE_ERROR("Failed to create fence!");
-		}
-	}
-
-	void FenceGroup::AddFencedCallback(std::function<void()> callback, uint32_t index)
-	{
-		m_IndexedCallbacks[index].push_back(callback);
-	}
-
-	void FenceGroup::Wait(uint32_t index, uint64_t timeout)
-	{
-		if (index == std::numeric_limits<uint32_t>::max())
-		{
-			vkWaitForFences(m_Device, m_VkFences.size(), m_VkFences.data(), VK_TRUE, std::numeric_limits<uint64_t>::max());
-			
-			for (auto& [index, callbacks] : m_IndexedCallbacks)
-			{
-				for (const auto& callback : callbacks)
-					callback();
-
-				callbacks.clear();
-			}
-
-			vkResetFences(m_Device, m_VkFences.size(), m_VkFences.data());
-		}
-		else
-		{
-			vkWaitForFences(m_Device, 1, &m_VkFences[index], VK_TRUE, std::numeric_limits<uint64_t>::max());
-			
-			for (const auto& callback : m_IndexedCallbacks[index])
-				callback();
-
-			m_IndexedCallbacks[index].clear();
-
-			vkResetFences(m_Device, 1, &m_VkFences[index]);
-		}
-	}
-
-	void FenceGroup::Dispose()
-	{
-		for (const auto& fence : m_VkFences)
-			vkDestroyFence(m_Device, fence, nullptr);
-	}
-
-	uint64_t FenceGroupDescriptor::Hash() const
-	{
-		Hasher hasher;
-
-		hasher.Hash((uint32_t)Identifier);
-		hasher.Hash(FenceCount);
-		hasher.Hash((uint32_t)CreateFlags);
-
-		return hasher.GetValue();
-	}
-
-	uint64_t SemaphoreGroupDescriptor::Hash() const
-	{
-		Hasher hasher;
-
-		hasher.Hash((uint32_t)Identifier);
-		hasher.Hash(SemaphoreCount);
-
-		return hasher.GetValue();
-	}
-
-	// Semaphores
-
-	SemaphoreManager::SemaphoreManager(VkDevice device) : m_Device(device)
-	{
-	}
-
-	std::vector<VkSemaphore>& SemaphoreManager::GetSemaphoreGroup(const SemaphoreGroupDescriptor& descriptor)
-	{
-		auto hash = descriptor.Hash();
-
-		if (m_SemaphoreGroups.find(hash) == m_SemaphoreGroups.end())
-		{
-			m_SemaphoreGroups[hash].resize(descriptor.SemaphoreCount);
-			for (auto& semaphore : m_SemaphoreGroups[hash])
-			{
-				VkSemaphoreCreateInfo createInfo{};
-				createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-				vkCreateSemaphore(m_Device, &createInfo, nullptr, &semaphore);
-			}
-		}
-
-		return m_SemaphoreGroups.at(hash);
-	}
-
-	void SemaphoreManager::Dispose()
-	{
-		for (const auto& [hash, semaphoreVector] : m_SemaphoreGroups)
-			for (auto semaphore : semaphoreVector)
-				vkDestroySemaphore(m_Device, semaphore, nullptr);
 	}
 }
 

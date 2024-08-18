@@ -18,6 +18,11 @@
 #include "log.h"
 #include "vma_usage.h"
 #include "window.h"
+#include "pixelate_device.h"
+#include "semaphore_manager.h"
+#include "fence_manager.h"
+#include "command_buffer_manager.h"
+#include "queue_manager.h"
 #include "resource_manager.h"
 #include "renderer.h"
 

@@ -11,32 +11,24 @@ namespace Pixelate
 		hasher.Hash(std::hash<std::thread::id>()(threadId));
 		hasher.Hash((uint32_t)Type);
 		hasher.Hash((uint32_t)Level);
+		hasher.Hash((uint32_t)PerformanceProfile);
 		hasher.Hash((uint32_t)device);
 
 		return hasher.GetValue();
 	}
 
-	uint64_t CommandBufferDescriptor::HashType(VkDevice device)
+	void PixelateVkCommandBuffer::Return()
 	{
-		auto threadId = std::this_thread::get_id();
-
-		Hasher hasher;
-
-		hasher.Hash(std::hash<std::thread::id>()(threadId));
-		hasher.Hash((uint32_t)Type);
-		hasher.Hash((uint32_t)device);
-
-		return hasher.GetValue();
+		CommandBufferManager::ReturnCommandBuffer(Device, CommandBuffer, Descriptor);
 	}
 }
 
 namespace Pixelate::CommandBufferManager
 {
-
-	std::unordered_map<uint64_t, VkCommandPool> m_CommandPools;
-	std::unordered_map<uint64_t, ThreadSafeQueue<VkCommandBuffer>> m_CommandBuffers;
-	uint32_t LastCommandBufferAllocationSize = 16;
-	static constexpr uint32_t CommandBufferGrowthRate = 2;
+	std::unordered_map<uint64_t, VkCommandPool> g_CommandPools;
+	std::unordered_map<uint64_t, ThreadSafeFifoQueue<VkCommandBuffer>> g_CommandBuffers;
+	uint32_t g_LastCommandBufferAllocationCount = 8;
+	static constexpr uint32_t s_CommandBufferGrowthRate = 2;
 
 	static inline uint32_t GetQueueFamilyIndexFromBufferType(CommandBufferType type, QueueFamilyIndices queueFamilyIndices)
 	{
@@ -53,7 +45,6 @@ namespace Pixelate::CommandBufferManager
 
 	static void AllocateCommandPool(VkDevice device, QueueFamilyIndices queueFamilyIndices, CommandBufferType type, VkCommandPool* commandPool)
 	{
-
 		uint32_t queueFamilyIndex = GetQueueFamilyIndexFromBufferType(type, queueFamilyIndices);
 
 		VkCommandPoolCreateInfo createInfo{};
@@ -66,8 +57,8 @@ namespace Pixelate::CommandBufferManager
 
 	static std::vector<VkCommandBuffer> AllocateCommandBuffers(VkDevice device, VkCommandPool commandPool, VkCommandBufferLevel level, uint32_t count)
 	{
-		std::vector<VkCommandBuffer> newCommandBuffers{};
-
+		std::vector<VkCommandBuffer> newCommandBuffers(count);
+		
 		VkCommandBufferAllocateInfo allocationInfo{};
 		allocationInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		allocationInfo.commandBufferCount = count;
@@ -79,28 +70,40 @@ namespace Pixelate::CommandBufferManager
 		return newCommandBuffers;
 	}
 
-	VkCommandBuffer CommandBufferManager::GetCommandBuffer(PixelateDevice device, CommandBufferDescriptor descriptor)
+	PixelateVkCommandBuffer CommandBufferManager::GetCommandBuffer(PixelateDevice device, CommandBufferDescriptor descriptor)
 	{
-		auto hash = descriptor.Hash(device.VkDevice);
-		auto typeHash = descriptor.HashType(device.VkDevice);
+		auto poolHash = descriptor.Hash(device.VkDevice);
 
-		if (m_CommandBuffers.find(hash) != m_CommandBuffers.end())
+		if (g_CommandBuffers.find(poolHash) != g_CommandBuffers.end())
 		{
 			VkCommandBuffer commandBuffer{};
-			if (m_CommandBuffers[hash].try_pop(commandBuffer))
-				return commandBuffer;
+			if (g_CommandBuffers[poolHash].try_pop(commandBuffer))
+				return { device.VkDevice, descriptor, commandBuffer };
 		}
 
-		if (m_CommandPools.find(typeHash) == m_CommandPools.end())
+		if (g_CommandPools.find(poolHash) == g_CommandPools.end())
 		{
-			m_CommandPools.insert({ typeHash, VK_NULL_HANDLE });
-			AllocateCommandPool(device.VkDevice, device.QueueFamilyIndices, descriptor.Type, &m_CommandPools[hash]);
+			g_CommandPools.insert({ poolHash, VK_NULL_HANDLE });
+			AllocateCommandPool(device.VkDevice, device.QueueFamilyIndices, descriptor.Type, &g_CommandPools.at(poolHash));
 		}
 
-		auto newCommandBuffers = AllocateCommandBuffers(device.VkDevice, m_CommandPools[typeHash], descriptor.Level, LastCommandBufferAllocationSize * CommandBufferGrowthRate);
+		auto bufferAllocationCount = g_LastCommandBufferAllocationCount * s_CommandBufferGrowthRate;
+		g_LastCommandBufferAllocationCount = bufferAllocationCount;
+		auto newCommandBuffers = AllocateCommandBuffers(device.VkDevice, g_CommandPools[poolHash], descriptor.Level, bufferAllocationCount);
 
-		m_CommandBuffers[hash].push_range(newCommandBuffers);
+		g_CommandBuffers[poolHash].push_range(newCommandBuffers);
 
-		return m_CommandBuffers[hash].pop();
+		return { device.VkDevice, descriptor, g_CommandBuffers[poolHash].pop() };
+	}
+
+	void ReturnCommandBuffer(VkDevice device, VkCommandBuffer commandBuffer, CommandBufferDescriptor descriptor)
+	{
+		auto resetFlags = descriptor.PerformanceProfile == CommandBufferPerformanceProfile::PersistentResources
+			? VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT
+			: 0;
+
+		auto hash = descriptor.Hash(device);
+		vkResetCommandBuffer(commandBuffer, resetFlags);
+		g_CommandBuffers[hash].push(commandBuffer);
 	}
 }
