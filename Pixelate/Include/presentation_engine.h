@@ -2,13 +2,6 @@
 
 #include "internal_pixelate_include.h"
 
-namespace PixelateSettings
-{
-	constexpr VkFormat PREFERRED_SWAPCHAIN_IMAGE_FORMAT = VK_FORMAT_R8G8B8A8_SRGB;
-	constexpr VkColorSpaceKHR PREFERRED_SWAPCHAIN_COLOR_SPACE = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-	constexpr uint32_t MAX_FRAMES_IN_FLIGHT = 2;
-}
-
 namespace Pixelate
 {
 	bool SupportsSwapchain(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, std::vector<VkExtensionProperties> availableExtensions);
@@ -46,6 +39,7 @@ namespace Pixelate
 	};
 
 	// Presentation engine
+
 	class PixelateSemaphore;
 
 	class PixelatePresentationEngine

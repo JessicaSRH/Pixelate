@@ -2,9 +2,8 @@
 
 #include "internal_pixelate_include.h"
 
-
-namespace Pixelate {
-
+namespace Pixelate
+{
 	// Instance
 
 	constexpr const char* VK_KHR_win32_surface_extension = "VK_KHR_win32_surface";
@@ -20,6 +19,7 @@ namespace Pixelate {
 	};
 
 	// Renderer
+
 	class Renderer
 	{
 	public:
