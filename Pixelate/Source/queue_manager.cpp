@@ -74,10 +74,6 @@ namespace Pixelate
 			VkSemaphoreSubmitInfo* pWaitSemaphores,
 			uint32_t waitSemaphoreCount)
 		{
-			QueueSubmit1(device, descriptor, commandBuffer, signalFence, pSignalSemaphores, signalSemaphoreCount, pWaitSemaphores, waitSemaphoreCount);
-			return;
-
-
 			auto hash = descriptor.Hash(device.VkDevice);
 			auto& queue = g_Queues[hash];
 
@@ -87,7 +83,7 @@ namespace Pixelate
 			VkCommandBufferSubmitInfo commandBufferSubmitInfo{};
 			commandBufferSubmitInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
 			commandBufferSubmitInfo.commandBuffer = commandBuffer;
-			commandBufferSubmitInfo.deviceMask = 0xFFFFFFFF;
+			commandBufferSubmitInfo.deviceMask = 01;
 
 			VkSubmitInfo2 queueSubmitInfo{};
 			queueSubmitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;

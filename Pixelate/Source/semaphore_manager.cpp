@@ -17,7 +17,7 @@ namespace Pixelate
 	{
 		std::unordered_map<uint64_t, PixelateSemaphore> m_SemaphoreGroups;
 
-		PixelateSemaphore GetSemaphore(VkDevice device, VkPipelineStageFlags2 stageMask, SemaphoreDescriptor descriptor)
+		PixelateSemaphore& GetSemaphore(VkDevice device, VkPipelineStageFlags2 stageMask, SemaphoreDescriptor descriptor)
 		{
 			auto hash = descriptor.Hash();
 
@@ -26,12 +26,13 @@ namespace Pixelate
 			if (semaphoreFind != m_SemaphoreGroups.end())
 				return semaphoreFind->second;
 
-			m_SemaphoreGroups.insert(std::make_pair(hash, PixelateSemaphore{ VK_NULL_HANDLE, stageMask }));
-
+			VkSemaphore semaphore{};
 			VkSemaphoreCreateInfo createInfo{};
 			createInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-			vkCreateSemaphore(device, &createInfo, nullptr, &m_SemaphoreGroups[hash].Semaphore);
+			vkCreateSemaphore(device, &createInfo, nullptr, &semaphore);
+
+			m_SemaphoreGroups.insert(std::make_pair(hash, PixelateSemaphore(semaphore, stageMask)));
 
 			return m_SemaphoreGroups.at(hash);
 		}
@@ -42,36 +43,40 @@ namespace Pixelate
 					vkDestroySemaphore(device, pixelateSemaphore.Semaphore, nullptr);
 		}
 
-		std::vector<VkSemaphoreSubmitInfo> GetSubmitSemaphores(PixelateSemaphore semaphore)
+		std::vector<VkSemaphoreSubmitInfo> GetSemaphoreSubmitInfo(PixelateSemaphore semaphore)
 		{
-			return std::vector<VkSemaphoreSubmitInfo>{ (VkSemaphoreSubmitInfo)semaphore };
+			return std::vector<VkSemaphoreSubmitInfo>{ semaphore.SemaphoreSubmitInfo };
 		}
 		
-		std::vector<VkSemaphoreSubmitInfo> GetSubmitSemaphores(std::vector<PixelateSemaphore> semaphores)
+		std::vector<VkSemaphoreSubmitInfo> GetSemaphoreSubmitInfos(std::vector<PixelateSemaphore> semaphores)
 		{
 			std::vector<VkSemaphoreSubmitInfo> result{};
 			result.reserve(semaphores.size());
 
 			for (auto& semaphore : semaphores)
-				result.push_back((VkSemaphoreSubmitInfo)semaphore);
+				result.push_back(semaphore.SemaphoreSubmitInfo);
 
 			return result;
 		}
 	}
 
+	PixelateSemaphore::PixelateSemaphore(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) :
+		Semaphore(semaphore),
+		StageMask(stageMask),
+		SemaphoreSubmitInfo(VkSemaphoreSubmitInfo
+			{
+				VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
+				nullptr,
+				Semaphore,
+				0,
+				StageMask,
+				0b1
+			})
+	{
+	}
+
 	PixelateSemaphore::operator VkSemaphore()
 	{
 		return Semaphore;
-	}
-
-	PixelateSemaphore::operator VkSemaphoreSubmitInfo()
-	{
-		VkSemaphoreSubmitInfo semaphoreSubmitInfo{};
-		semaphoreSubmitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
-		semaphoreSubmitInfo.deviceIndex = 0xFFFFFFFF;
-		semaphoreSubmitInfo.semaphore = Semaphore;
-		semaphoreSubmitInfo.stageMask = StageMask;
-		semaphoreSubmitInfo.value = 0;
-		return semaphoreSubmitInfo;
 	}
 }

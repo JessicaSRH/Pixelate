@@ -13,7 +13,31 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "renderer.h"
+#include "vma_usage.h" // includes Vulkan and SDL2
+
+#include "thread_safe_fifo_queue.h"
+#include "hasher.h"
+#include "log.h"
+#include "window.h"
+#include "pixelate_device.h"
+#include "semaphore_manager.h"
+#include "fence_manager.h"
+#include "command_buffer_manager.h"
+#include "queue_manager.h"
+#include "resource_manager.h"
+#include "presentation_engine.h"
+
+#ifdef DEBUG
+constexpr bool VALIDATION_LAYERS_ENABLED = true;
+#else
+constexpr bool VALIDATION_LAYERS_ENABLED = false;
+#endif
+
+enum class Platform { Win64 };
+
+#ifdef WIN64
+constexpr Platform PLATFORM = Platform::Win64;
+#endif
 
 // Todo:
 //  Create vkInstance! [x]
@@ -21,8 +45,8 @@
 //  Create VkPhysicalDevice and VkDevice! [x]
 //  Create vkSurface! [x]
 //  Create vkSwapchain! [x]
+//  Create render loop + presentation[x]
 // 
-//  Create render loop + presentation
 //  Create images, pipeline, framebuffers, renderpasses (dynamic rendering? GRAPH?)!
 //  Create basic shader and compile it into SPIRV
 //  Create render loop!

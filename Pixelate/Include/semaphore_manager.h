@@ -1,5 +1,5 @@
 #pragma once
-#include "pixelate_include.h"
+#include "internal_pixelate_include.h"
 
 namespace Pixelate
 {
@@ -11,26 +11,28 @@ namespace Pixelate
 
 	struct SemaphoreDescriptor
 	{
-		SemaphoreIdentifier Identifier = SemaphoreIdentifier::SwapchainImageHasBeenAcquired;
-		uint32_t Index;
+		const SemaphoreIdentifier Identifier = SemaphoreIdentifier::SwapchainImageHasBeenAcquired;
+		const uint32_t Index;
 
 		uint64_t Hash() const;
 	};
 
-	struct PixelateSemaphore
+	class PixelateSemaphore
 	{
-		VkSemaphore Semaphore = VK_NULL_HANDLE;
-		VkPipelineStageFlags2 StageMask = VK_PIPELINE_STAGE_2_NONE;
+	public:
+		PixelateSemaphore(VkSemaphore semaphore = VK_NULL_HANDLE, VkPipelineStageFlags2 stageMask = VK_PIPELINE_STAGE_2_NONE);
 
+		VkSemaphore Semaphore;
+		VkPipelineStageFlags2 StageMask;
+		VkSemaphoreSubmitInfo SemaphoreSubmitInfo;
 		operator VkSemaphore();
-		operator VkSemaphoreSubmitInfo();
 	};
 
 	namespace SemaphoreManager
 	{
-		PixelateSemaphore GetSemaphore(VkDevice device,VkPipelineStageFlags2 stageMask, SemaphoreDescriptor descriptor);
+		PixelateSemaphore& GetSemaphore(VkDevice device,VkPipelineStageFlags2 stageMask, SemaphoreDescriptor descriptor);
 		void Dispose(VkDevice device);
-		std::vector<VkSemaphoreSubmitInfo> GetSubmitSemaphores(PixelateSemaphore semaphore);
-		std::vector<VkSemaphoreSubmitInfo> GetSubmitSemaphores(std::vector<PixelateSemaphore> semaphores);
+		std::vector<VkSemaphoreSubmitInfo> GetSemaphoreSubmitInfo(PixelateSemaphore semaphore);
+		std::vector<VkSemaphoreSubmitInfo> GetSemaphoreSubmitInfos(std::vector<PixelateSemaphore> semaphores);
 	}
 }

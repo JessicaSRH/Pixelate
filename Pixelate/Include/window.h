@@ -1,5 +1,5 @@
 #pragma once
-#include "pixelate_include.h"
+#include "internal_pixelate_include.h"
 
 namespace Pixelate
 {
