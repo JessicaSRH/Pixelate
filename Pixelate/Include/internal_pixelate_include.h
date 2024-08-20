@@ -72,6 +72,7 @@ namespace PixelateSettings
 }
 #endif
 
+#include "pixelate_helpers.h"
 #include "thread_safe_fifo_queue.h"
 #include "hasher.h"
 #include "window.h"
