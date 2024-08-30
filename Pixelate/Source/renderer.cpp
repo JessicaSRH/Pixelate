@@ -1,4 +1,20 @@
 #include "renderer.h"
+#include "internal_pixelate_include.h"
+#include "log.h"
+#include "hasher.h"
+#include "window.h"
+#include "pixelate_device.h"
+#include "semaphore_manager.h"
+#include "fence_manager.h"
+//#include "pixelate_helpers.h"
+//#include "thread_safe_fifo_queue.h"
+//#include "command_buffer_manager.h"
+//#include "queue_manager.h"
+//#include "resource_manager.h"
+//#include "presentation_engine.h"
+//#include "pipeline_manager.h"
+//#include "pixelate_render_pass.h"
+//#include "render_graph.h"
 
 namespace Pixelate
 {
@@ -445,7 +461,7 @@ namespace Pixelate
 		m_Presentation.Initialize(m_Device);
 	}
 
-	void Renderer::Render(std::function<bool()> inputHandler)
+	void Renderer::Render(RenderGraph renderGraph, std::function<bool()> inputHandler)
 	{
 		auto quit = false;
 		while (!quit)
@@ -473,6 +489,7 @@ namespace Pixelate
 
 			auto [swapchainImageIndex, swapchainImageView] = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
 
+			renderGraph.Render();
 			// record command buffers that render (or copy/blit) to swapchain image
 			// submit command buffers to graphics queue
 				// - assign frame-in-flight fence to be signaled on completion
@@ -482,6 +499,11 @@ namespace Pixelate
 
 			m_FrameInFlightIndex = (m_FrameInFlightIndex + 1) % PixelateSettings::MAX_FRAMES_IN_FLIGHT;
 		}
+	}
+
+	RenderGraph Renderer::BuildRenderGraph(RenderGraphDescriptor& descriptor)
+	{
+		return RenderGraph(m_Device.VkDevice, descriptor);
 	}
 
 	const SDL_Window* Renderer::GetWindow() const

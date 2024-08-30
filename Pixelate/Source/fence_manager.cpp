@@ -1,4 +1,6 @@
 #include "fence_manager.h"
+#include "hasher.h"
+#include "log.h"
 
 namespace Pixelate
 {

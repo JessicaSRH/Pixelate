@@ -1,7 +1,5 @@
 #pragma once
 
-#include "internal_pixelate_include.h"
-
 namespace Pixelate
 {
 	constexpr uint64_t FNV_PRIME = 0x100000001b3ull; // FNV-1a 64-bit salt
@@ -10,24 +8,30 @@ namespace Pixelate
 	{
 	public:
 
-		void Hash(char value)
+		void Hash(const char value)
 		{
 			m_Hash = (m_Hash ^ value) * FNV_PRIME;
 		}
 
-		void Hash(uint16_t value)
+		void Hash(const char* ptr, size_t size)
+		{
+			for (size_t i = 0; i < size; i++)
+				Hash(ptr[i]);
+		}
+
+		void Hash(const uint16_t value)
 		{
 			Hash((char)(value & 01));
 			Hash((char)(value >> 8));
 		}
 
-		void Hash(uint32_t value)
+		void Hash(const uint32_t value)
 		{
 			Hash((uint16_t)value);
 			Hash((uint16_t)(value >> 16));
 		}
 
-		void Hash(uint64_t value)
+		void Hash(const uint64_t value)
 		{
 			Hash((uint32_t)value);
 			Hash((uint32_t)(value >> 32));
@@ -41,10 +45,10 @@ namespace Pixelate
 
 		void Hash(const std::string& string)
 		{
-			Hash(string.c_str());
+			Hash(string.c_str(), string.size());
 		}
 
-		uint64_t GetValue()
+		uint64_t GetValue() const
 		{
 			return m_Hash;
 		}

@@ -1,4 +1,8 @@
+
+#include <unordered_map>
+
 #include "queue_manager.h"
+#include "hasher.h"
 
 namespace Pixelate
 {

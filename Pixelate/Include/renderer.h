@@ -1,6 +1,9 @@
 #pragma once
-
-#include "internal_pixelate_include.h"
+#include <functional>
+#include "vma_usage.h"
+#include "resource_manager.h"
+#include "presentation_engine.h"
+#include "render_graph.h"
 
 namespace Pixelate
 {
@@ -27,7 +30,8 @@ namespace Pixelate
 
 		const VulkanResourceManager& GetImageManager() const { m_VulkanResourceManager; }
 
-		void Render(std::function<bool()> inputHandler);
+		void Render(RenderGraph renderGraph, std::function<bool()> inputHandler);
+		RenderGraph BuildRenderGraph(RenderGraphDescriptor& descriptor);
 		const SDL_Window* GetWindow() const;
 
 		~Renderer();

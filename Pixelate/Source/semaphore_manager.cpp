@@ -1,4 +1,6 @@
+#include <unordered_map>
 #include "semaphore_manager.h"
+#include "hasher.h"
 
 namespace Pixelate
 {

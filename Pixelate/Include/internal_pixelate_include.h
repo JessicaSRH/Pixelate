@@ -52,8 +52,6 @@
 
 #include "vma_usage.h" // includes Vulkan and SDL2
 
-#include "log.h"
-
 #ifdef _MSC_VER
 #pragma warning(pop)
 #elif defined(__GNUC__) || defined(__clang__)
@@ -72,18 +70,20 @@ namespace PixelateSettings
 }
 #endif
 
-#include "pixelate_helpers.h"
-#include "thread_safe_fifo_queue.h"
-#include "hasher.h"
-#include "window.h"
-#include "pixelate_device.h"
-#include "semaphore_manager.h"
-#include "fence_manager.h"
-#include "command_buffer_manager.h"
-#include "queue_manager.h"
-#include "resource_manager.h"
-#include "presentation_engine.h"
-#include "pipeline_manager.h"
+//#include "pixelate_helpers.h"
+//#include "thread_safe_fifo_queue.h"
+//#include "hasher.h"
+//#include "window.h"
+//#include "pixelate_device.h"
+//#include "semaphore_manager.h"
+//#include "fence_manager.h"
+//#include "command_buffer_manager.h"
+//#include "queue_manager.h"
+//#include "resource_manager.h"
+//#include "presentation_engine.h"
+//#include "pipeline_manager.h"
+//#include "pixelate_render_pass.h"
+//#include "render_graph.h"
 
 #ifndef VALIDATION_DEFINITIONS
 #define VALIDATION_DEFINITIONS

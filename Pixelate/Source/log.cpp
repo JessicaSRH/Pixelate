@@ -1,4 +1,4 @@
-#include "pixelate_include.h"
+#include "log.h"
 
 namespace Pixelate {
 

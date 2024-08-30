@@ -13,6 +13,7 @@
 #include <mutex>
 #include <condition_variable>
 
+#include "log.h"
 #include "renderer.h"
 
 // Todo:

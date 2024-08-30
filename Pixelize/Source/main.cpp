@@ -52,11 +52,30 @@ namespace Pixelize
 	}
 }
 
+void TrianglePassCommandBuffer(VkCommandBuffer commandBuffer, VkPipeline pipelineHandle)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineHandle);
+	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+}
+
 int main(int argc, char** argv)
 {	
-	auto renderer = Renderer("Pixelize", Pixelize::WINDOW_OFFSET_X, Pixelize::WINDOW_OFFSET_Y, Pixelize::WINDOW_WIDTH, Pixelize::WINDOW_HEIGHT);
+	auto renderer = Pixelate::Renderer("Pixelize", Pixelize::WINDOW_OFFSET_X, Pixelize::WINDOW_OFFSET_Y, Pixelize::WINDOW_WIDTH, Pixelize::WINDOW_HEIGHT);
+
+	Pixelate::RenderGraphDescriptor renderGraphDescriptor { };
 	
-	renderer.Render(Pixelize::HandleInput);
+	renderGraphDescriptor.Passes.reserve(1);
+
+	renderGraphDescriptor.Passes.emplace_back(std::move(PixelatePass(
+		"TrianglePass",
+		GraphicsPipelineDescriptor("triangle"),
+		PixelateCommandBufferFlagBits::PIXELATE_COMMAND_BUFFER_RECORD_ONCE,
+		TrianglePassCommandBuffer))
+	);
+
+	auto renderGraph = renderer.BuildRenderGraph(renderGraphDescriptor);
+
+	renderer.Render(renderGraph, Pixelize::HandleInput);
 
 	return 0;
 }

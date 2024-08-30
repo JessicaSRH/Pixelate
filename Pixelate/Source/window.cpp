@@ -1,4 +1,5 @@
 #include "window.h"
+#include "log.h"
 
 namespace Pixelate
 {

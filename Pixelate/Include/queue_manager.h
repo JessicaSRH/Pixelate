@@ -1,6 +1,7 @@
 #pragma once
 
-#include "internal_pixelate_include.h"
+#include "vma_usage.h"
+#include "pixelate_device.h"
 
 namespace Pixelate
 {

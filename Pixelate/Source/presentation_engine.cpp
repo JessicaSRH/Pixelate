@@ -1,4 +1,11 @@
 #include "presentation_engine.h"
+#include "internal_pixelate_include.h"
+#include "log.h"
+#include "semaphore_manager.h"
+#include "queue_manager.h"
+#include "fence_manager.h"
+#include "command_buffer_manager.h"
+#include "window.h"
 
 namespace Pixelate
 {

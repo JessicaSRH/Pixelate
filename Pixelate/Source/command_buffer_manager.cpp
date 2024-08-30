@@ -1,4 +1,7 @@
+#include <unordered_map>
 #include "command_buffer_manager.h"
+#include "hasher.h"
+#include "thread_safe_fifo_queue.h"
 
 namespace Pixelate
 {
