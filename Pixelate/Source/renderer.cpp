@@ -328,7 +328,7 @@ namespace Pixelate
 		return device;
 	}
 
-	static VpProfileProperties GetProfileProperties(const char* profileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION)
+	static VpProfileProperties GetProfileProperties(const char* profileName = PixelateVulkanProfile::PROFILE_NAME, const int profileSpecVersion = PixelateVulkanProfile::PROFILE_SPEC_VERSION)
 	{
 		VpProfileProperties profile{};
 
@@ -338,7 +338,7 @@ namespace Pixelate
 		return profile;
 	}
 
-	static PixelateInstance VulkanProfileBootstrap(const char* applicationName, const char* profileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION, unsigned int minApiVersion = VP_KHR_ROADMAP_2022_MIN_API_VERSION)
+	static PixelateInstance VulkanProfileBootstrap(const char* applicationName, const char* profileName = PixelateVulkanProfile::PROFILE_NAME, const int profileSpecVersion = PixelateVulkanProfile::PROFILE_SPEC_VERSION, unsigned int minApiVersion = PixelateVulkanProfile::PROFILE_MIN_API_VERSION)
 	{
 		Log::Init();
 

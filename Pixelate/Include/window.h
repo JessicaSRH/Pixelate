@@ -1,8 +1,6 @@
 #pragma once
 
 #include "vma_usage.h"
-#include "SDL2/SDL.h"
-#include "SDL2/SDL_vulkan.h"
 
 namespace Pixelate
 {

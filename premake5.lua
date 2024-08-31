@@ -28,6 +28,7 @@ project "Pixelate"
 
 	includedirs {
 		"Pixelate/ThirdParty/spdlog/include",
+		"Pixelate/ThirdParty/VulkanProfiles/Include",
 		vulkanSDKpath .. "/Include",
 		pixelateSourcePath,
 		pixelateIndlucePath
@@ -56,6 +57,10 @@ project "Pixelate"
 	filter "platforms:Win64"
 	defines { "WIN64" }
 
+	filter "action:vs*"
+		buildoptions { "/MP" }
+
+
 project "Pixelize"
 	kind "ConsoleApp"
 	language "C++"
@@ -71,6 +76,7 @@ project "Pixelize"
 
 	includedirs {
 		"Pixelate/ThirdParty/spdlog/include",
+		"Pixelate/ThirdParty/VulkanProfiles/Include",
 		pixelateIndlucePath,
 		vulkanSDKpath .. "/Include"
 	}

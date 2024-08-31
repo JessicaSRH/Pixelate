@@ -4,7 +4,12 @@ namespace Pixelate
 {
 	RenderGraph::RenderGraph(VkDevice device, const RenderGraphDescriptor& descriptor)
 	{
-		// Todo: build the actual render graph
+		// TODO:
+		// Build VkRenderingInfoKHR and VkPipelines
+
+		// TODO later:
+		// Introduce inputs/outputs for topological sorting and automatic barriers
+
 	}
 
 	void RenderGraph::Render() const

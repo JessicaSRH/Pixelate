@@ -50,7 +50,7 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "vma_usage.h" // includes Vulkan and SDL2
+#include "vma_usage.h"
 
 #ifdef _MSC_VER
 #pragma warning(pop)

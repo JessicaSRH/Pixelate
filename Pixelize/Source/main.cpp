@@ -1,5 +1,8 @@
 #include "pixelate_include.h"
 
+#include "SDL2/SDL.h"
+#include "SDL2/SDL_vulkan.h"
+
 using namespace Pixelate;
 
 namespace Pixelize

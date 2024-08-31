@@ -26,7 +26,7 @@ namespace Pixelate
 	class Renderer
 	{
 	public:
-		Renderer(const char* applicationName, int x, int y, int width, int height, const char* vulkanProfileName = VP_KHR_ROADMAP_2022_NAME, const int profileSpecVersion = VP_KHR_ROADMAP_2022_SPEC_VERSION, unsigned int minApiVersion = VP_KHR_ROADMAP_2022_MIN_API_VERSION);
+		Renderer(const char* applicationName, int x, int y, int width, int height, const char* vulkanProfileName = PixelateVulkanProfile::PROFILE_NAME, const int profileSpecVersion = PixelateVulkanProfile::PROFILE_SPEC_VERSION, unsigned int minApiVersion = PixelateVulkanProfile::PROFILE_MIN_API_VERSION);
 
 		const VulkanResourceManager& GetImageManager() const { m_VulkanResourceManager; }
 
