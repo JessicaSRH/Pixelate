@@ -1,39 +1,50 @@
 #pragma once
 
+#include "presentation_engine.h"
 #include "pixelate_render_pass.h"
 #include "pipeline_manager.h"
 
 namespace Pixelate
 {
+
 	struct RenderGraphDescriptor
 	{
-		std::vector<PixelatePass> Passes;
+		std::vector<PixelatePass> Passes{};
+	};
+
+	struct PixelateRenderingInfo
+	{
+		VkRenderingInfo RenderingInfo{};
+		std::vector<VkRenderingAttachmentInfo> ColorAttachments{};
+		std::optional<VkRenderingAttachmentInfo> DepthAttachment = std::nullopt;;
+		std::optional<VkRenderingAttachmentInfo> StencilAttachment = std::nullopt;
 	};
 
 	struct PixelateRuntimePass
 	{
+		static constexpr int RenderingInfosCount = 3;// allocate room for up to 3 different render targets
+
 		const char* PassName;
-		uint16_t SubpassIndex;
+		PassType PassType;
+		PixelatePassFlags Flags;
+		VkCommandBuffer CommandBuffer;
 		VkDevice Device;
 		VkPipeline Pipeline;
-		VkRenderPass RenderPass;
-		VkCommandBuffer CommandBuffer;
-		PassType PassType;
 		union
 		{
 			CommandGraphics CommandBufferGraphics;
 			CommandHost CommandBufferHost;
 		};
-		PixelateCommandBufferFlags Flags;
+		PixelateRenderingInfo RenderingInfos[RenderingInfosCount];
 	};
 
 	class RenderGraph
 	{
 	public:
-		RenderGraph(VkDevice device, const RenderGraphDescriptor& descriptor);
-		void Render() const;
+		RenderGraph(PixelateDevice device, const RenderGraphDescriptor& descriptor, const PixelateSwapchain& swapchain);
+		void Render(uint32_t frameInFlightIndex, uint32_t swapchainImageIndex) const;
 	private:
-		std::vector<PixelateRuntimePass> Passes;
+		std::vector<PixelateRuntimePass> RuntimePasses;
 
 	};
 }

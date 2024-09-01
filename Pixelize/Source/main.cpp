@@ -61,21 +61,56 @@ void TrianglePassCommandBuffer(VkCommandBuffer commandBuffer, VkPipeline pipelin
 	vkCmdDraw(commandBuffer, 3, 1, 0, 0);
 }
 
+static PixelatePass GetTrianglePass()
+{
+	PixelatePass trianglePass(
+		"TrianglePass",
+		std::move(
+			GraphicsPipelineDescriptor
+			{
+				.ShaderDescriptor =
+				{
+					PixelateShaderDescriptor
+					{
+						.Name = "triangle",
+						.Path = "Pixelize/Resources/Shaders/",
+						.ShaderStages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+					},
+				}
+			}
+			),
+			PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN | PIXELATE_PASS_RECORD_ONCE,
+			TrianglePassCommandBuffer,
+		{
+			// Inputs if any
+		},
+		{
+			PixelateResourceUsage
+			{
+				.Resource = PixelateResource
+				{
+					.Name = "MainColorAttachment",
+				},
+				.UsageFlags = PIXELATE_USAGE_COLOR_ATTACMENT,
+			},
+		}
+		);
+
+	return trianglePass;
+}
+
 int main(int argc, char** argv)
 {	
 	auto renderer = Pixelate::Renderer("Pixelize", Pixelize::WINDOW_OFFSET_X, Pixelize::WINDOW_OFFSET_Y, Pixelize::WINDOW_WIDTH, Pixelize::WINDOW_HEIGHT);
 
-	Pixelate::RenderGraphDescriptor renderGraphDescriptor { };
+	Pixelate::RenderGraphDescriptor renderGraphDescriptor
+	{
+		.Passes =
+		{
+			 GetTrianglePass(),
+		}
+	};
 	
-	renderGraphDescriptor.Passes.reserve(1);
-
-	renderGraphDescriptor.Passes.emplace_back(std::move(PixelatePass(
-		"TrianglePass",
-		GraphicsPipelineDescriptor("triangle"),
-		PixelateCommandBufferFlagBits::PIXELATE_COMMAND_BUFFER_RECORD_ONCE,
-		TrianglePassCommandBuffer))
-	);
-
 	auto renderGraph = renderer.BuildRenderGraph(renderGraphDescriptor);
 
 	renderer.Render(renderGraph, Pixelize::HandleInput);

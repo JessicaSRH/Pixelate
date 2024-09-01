@@ -489,7 +489,7 @@ namespace Pixelate
 
 			auto [swapchainImageIndex, swapchainImageView] = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
 
-			renderGraph.Render();
+			renderGraph.Render(m_FrameInFlightIndex, swapchainImageIndex);
 			// record command buffers that render (or copy/blit) to swapchain image
 			// submit command buffers to graphics queue
 				// - assign frame-in-flight fence to be signaled on completion
@@ -501,9 +501,9 @@ namespace Pixelate
 		}
 	}
 
-	RenderGraph Renderer::BuildRenderGraph(RenderGraphDescriptor& descriptor)
+	RenderGraph Renderer::BuildRenderGraph(RenderGraphDescriptor& renderGraphDescriptor)
 	{
-		return RenderGraph(m_Device.VkDevice, descriptor);
+		return RenderGraph(m_Device, renderGraphDescriptor, m_Presentation.GetSwapchain());
 	}
 
 	const SDL_Window* Renderer::GetWindow() const

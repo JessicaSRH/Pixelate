@@ -13,7 +13,7 @@ for %%f in (*.glsl) do (
 
 	set ERROFLAG_FOR_FILE=0
 
-	glslc -DVERTEX_SHADER -fshader-stage=vertex -o spirv_!FILENAME!_vertex.spv %%f
+	glslc -DVERTEX_SHADER -fshader-stage=vertex -o !FILENAME!_vertex.spv %%f
 	if !errorlevel! neq 0 (
 		echo %ESC%[31mVertex shader compilation failed for %%f.%ESC%[0m
 		echo.
@@ -21,7 +21,7 @@ for %%f in (*.glsl) do (
 		set ERROFLAG_FOR_FILE=1
 	)
 
-	glslc -DFRAGMENT_SHADER -fshader-stage=fragment -o spirv_!FILENAME!_fragment.spv %%f
+	glslc -DFRAGMENT_SHADER -fshader-stage=fragment -o !FILENAME!_fragment.spv %%f
 	if !errorlevel! neq 0 (
 		echo %ESC%[31mFragment shader compilation failed for %%f.%ESC%[0m
 		echo.

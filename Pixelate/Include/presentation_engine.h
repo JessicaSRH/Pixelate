@@ -29,7 +29,7 @@ namespace Pixelate
 		std::vector<VkImage> SwapchainImages;
 		std::vector<VkImageView> SwapchainImageViews;
 	public:
-		PixelateSwapchain() {}
+		PixelateSwapchain() = default;
 		PixelateSwapchain(PixelateDevice device, VkSurfaceKHR surface, SDL_Window* window);
 		void Dispose();
 		void Recreate();
@@ -52,6 +52,7 @@ namespace Pixelate
 		int GetHeight() { return m_Height; }
 		const SDL_Window* GetWindow() const { return m_Window; }
 		const VkSurfaceKHR GetSurface() const { return m_VkSurfaceKHR; }
+		const PixelateSwapchain GetSwapchain() const { return m_Swapchain; }
 
 	public:
 		PixelatePresentationEngine(int width, int height, SDL_Window* window, VkSurfaceKHR surface);

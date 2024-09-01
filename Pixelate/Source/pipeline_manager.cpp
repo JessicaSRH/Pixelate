@@ -5,136 +5,13 @@
 
 namespace Pixelate
 {
-
-	GraphicsPipelineDescriptor::GraphicsPipelineDescriptor(const GraphicsPipelineDescriptor& other) :
-		Shader(other.Shader),
-		ShaderStageFlags(other.ShaderStageFlags),
-		DescriptorSetLayoutBindings(other.DescriptorSetLayoutBindings),
-		PushConstantRanges(other.PushConstantRanges),
-		VertexInputBindings(other.VertexInputBindings),
-		VertexInputAttributes(other.VertexInputAttributes),
-		InputAssemby(other.InputAssemby),
-		RasterizationState(other.RasterizationState),
-		MultisamplingState(other.MultisamplingState),
-		DepthStencilState(other.DepthStencilState),
-		ColorBlendingState(other.ColorBlendingState)
-	{
-
-		if (!other.DescriptorSetLayoutBindings.empty())
-			DescriptorSetLayoutBindings = other.DescriptorSetLayoutBindings;
-
-		if (!other.PushConstantRanges.empty())
-			PushConstantRanges = other.PushConstantRanges;
-
-		if (!other.VertexInputBindings.empty())
-			VertexInputBindings = other.VertexInputBindings;
-
-		if (!other.VertexInputAttributes.empty())
-			VertexInputAttributes = other.VertexInputAttributes;
-
-	}
-
-	GraphicsPipelineDescriptor& GraphicsPipelineDescriptor::operator=(const GraphicsPipelineDescriptor& other) noexcept
-	{
-		if (this != &other)
-		{
-			Shader = other.Shader;
-			ShaderStageFlags = other.ShaderStageFlags;
-
-			if (!other.DescriptorSetLayoutBindings.empty())
-				DescriptorSetLayoutBindings = other.DescriptorSetLayoutBindings;
-
-			if (!other.PushConstantRanges.empty())
-				PushConstantRanges = other.PushConstantRanges;
-
-			if (!other.VertexInputBindings.empty())
-				VertexInputBindings = other.VertexInputBindings;
-
-			if (!other.VertexInputAttributes.empty())
-				VertexInputAttributes = other.VertexInputAttributes;
-
-			InputAssemby = other.InputAssemby;
-			RasterizationState = other.RasterizationState;
-			MultisamplingState = other.MultisamplingState;
-			DepthStencilState = other.DepthStencilState;
-			ColorBlendingState = other.ColorBlendingState;
-		}
-		return *this;
-	}
-
-	GraphicsPipelineDescriptor::GraphicsPipelineDescriptor(GraphicsPipelineDescriptor&& other) noexcept :
-		Shader(other.Shader),
-		ShaderStageFlags(other.ShaderStageFlags),
-		DescriptorSetLayoutBindings(std::move(other.DescriptorSetLayoutBindings)),
-		PushConstantRanges(std::move(other.PushConstantRanges)),
-		VertexInputBindings(std::move(other.VertexInputBindings)),
-		VertexInputAttributes(std::move(other.VertexInputAttributes)),
-		InputAssemby(other.InputAssemby),
-		RasterizationState(other.RasterizationState),
-		MultisamplingState(other.MultisamplingState),
-		DepthStencilState(other.DepthStencilState),
-		ColorBlendingState(other.ColorBlendingState)
-	{
-	}
-
-	GraphicsPipelineDescriptor& GraphicsPipelineDescriptor::operator=(GraphicsPipelineDescriptor && other) noexcept
-	{
-		if (this != &other)
-		{
-			Shader = other.Shader;
-			ShaderStageFlags = other.ShaderStageFlags;
-
-			if (!other.DescriptorSetLayoutBindings.empty())
-				DescriptorSetLayoutBindings = std::move(other.DescriptorSetLayoutBindings);
-
-			if (!other.PushConstantRanges.empty())
-				PushConstantRanges = std::move(other.PushConstantRanges);
-
-			if (!other.VertexInputBindings.empty())
-				VertexInputBindings = std::move(other.VertexInputBindings);
-
-			if (!other.VertexInputAttributes.empty())
-				VertexInputAttributes = std::move(other.VertexInputAttributes);
-
-			InputAssemby = other.InputAssemby;
-			RasterizationState = other.RasterizationState;
-			MultisamplingState = other.MultisamplingState;
-			DepthStencilState = other.DepthStencilState;
-			ColorBlendingState = other.ColorBlendingState;
-		}
-		return *this;
-	}
-
-	uint64_t GraphicsPipelineDescriptor::Hash() const
-	{
-		Hasher hasher;
-
-		hasher.Hash(Shader);
-		hasher.Hash(ShaderStageFlags);
-
-		hasher.Hash((const char*)DescriptorSetLayoutBindings.data(), sizeof(DescriptorSetLayoutBindings) * DescriptorSetLayoutBindings.size());
-		hasher.Hash((const char*)PushConstantRanges.data(), sizeof(PushConstantRanges) * PushConstantRanges.size());
-		hasher.Hash((const char*)VertexInputBindings.data(), sizeof(VkVertexInputBindingDescription) * VertexInputBindings.size());
-		hasher.Hash((const char*)VertexInputAttributes.data(), sizeof(VkVertexInputAttributeDescription) * VertexInputAttributes.size());
-
-		hasher.Hash((const char*) &InputAssemby, sizeof(VkPipelineInputAssemblyStateCreateInfo));
-		hasher.Hash((const char*)&RasterizationState, sizeof(VkPipelineRasterizationStateCreateInfo));
-		hasher.Hash((const char*)&MultisamplingState, sizeof(VkPipelineMultisampleStateCreateInfo));
-		hasher.Hash((const char*)&DepthStencilState, sizeof(VkPipelineDepthStencilStateCreateInfo));
-		hasher.Hash((const char*)&ColorBlendingState, sizeof(VkPipelineColorBlendStateCreateInfo));
-
-		return hasher.GetValue();
-	}
-
 	namespace Pipelines
 	{
-		std::vector<VkDescriptorSetLayout> GetDescriptorSetLayouts(VkDevice device, GraphicsPipelineDescriptor& descriptor)
+		std::vector<VkDescriptorSetLayout> GetDescriptorSetLayouts(VkDevice device, const GraphicsPipelineDescriptor& descriptor)
 		{
-			return std::vector<VkDescriptorSetLayout>{};
-
 			std::vector<VkDescriptorSetLayout> descriptorSetLayouts{};
 			descriptorSetLayouts.reserve(descriptor.DescriptorSetLayoutBindings.size());
-			
+
 			for (auto& descriptorBinding : descriptor.DescriptorSetLayoutBindings)
 			{
 				VkDescriptorSetLayoutCreateInfo layoutInfo
@@ -152,10 +29,8 @@ namespace Pixelate
 			return descriptorSetLayouts;
 		}
 
-		VkPipelineLayout GetPipelineLayout(VkDevice device, GraphicsPipelineDescriptor& descriptor)
+		VkPipelineLayout GetPipelineLayout(VkDevice device, const GraphicsPipelineDescriptor& descriptor)
 		{
-			return VK_NULL_HANDLE;
-
 			auto descriptorSetLayouts = GetDescriptorSetLayouts(device, descriptor);
 
 			VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo
@@ -178,7 +53,7 @@ namespace Pixelate
 			return pipelineLayout;
 		}
 
-		static std::vector<VkPipelineShaderStageCreateInfo> GetPipelineShaderStageInfo(VkDevice device, GraphicsPipelineDescriptor& descriptor)
+		static std::vector<VkPipelineShaderStageCreateInfo> GetPipelineShaderStageInfo(VkDevice device, const GraphicsPipelineDescriptor& descriptor)
 		{
 			constexpr std::array<VkShaderStageFlagBits, 2> supportedGraphicsShaderStages
 			{
@@ -188,14 +63,21 @@ namespace Pixelate
 
 			std::vector<VkPipelineShaderStageCreateInfo> shaderStages{};
 
-			for (const auto shaderStageFlag : supportedGraphicsShaderStages)
+			for (const auto& shaderStage : supportedGraphicsShaderStages)
 			{
-				if (!(descriptor.ShaderStageFlags & shaderStageFlag))
-					continue; // shader stage is not included
+				if (!(descriptor.ShaderDescriptor.ShaderStages & shaderStage))
+				{
+					PXL8_CORE_WARN("Shader stage not supported: " + shaderStage);
+					continue;
+				}
 
-				std::string shaderPath = "spirv_";
-				shaderPath += +descriptor.Shader;
-				switch (shaderStageFlag)
+				std::string shaderPath = descriptor.ShaderDescriptor.Path;
+
+				if (shaderPath.back() != '/')
+					shaderPath += '/';
+
+				shaderPath += descriptor.ShaderDescriptor.Name;
+				switch (shaderStage)
 				{
 				case VK_SHADER_STAGE_VERTEX_BIT:
 					shaderPath += "_vertex.spv";
@@ -223,7 +105,7 @@ namespace Pixelate
 				shaderStages.emplace_back(VkPipelineShaderStageCreateInfo
 				{
 					.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-					.stage = shaderStageFlag,
+					.stage = shaderStage,
 					.module = shaderModule,
 					.pName = "main",
 				});
@@ -232,48 +114,83 @@ namespace Pixelate
 			return shaderStages;
 		}
 
-		static std::tuple<VkPipelineColorBlendStateCreateInfo, std::vector<VkPipelineColorBlendAttachmentState>> GetColorBlendState()
+		static std::tuple<VkPipelineColorBlendStateCreateInfo, std::vector<VkPipelineColorBlendAttachmentState>> GetColorBlendState(
+			const GraphicsPipelineDescriptor& pipelineDescriptor,
+			const std::vector<PixelateResourceUsage>& outputs)
 		{
-			// Store these on the render pass attachments
-			VkPipelineColorBlendAttachmentState colorBlendAttachment =
-			{
-				.blendEnable = VK_FALSE,
-				.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-								  VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-			};
+			std::vector<VkPipelineColorBlendAttachmentState> attachmentBlendStates{};
+
+			for (int i = 0; i < outputs.size(); i++)
+				if (outputs[i].UsageFlags & PixelateResourceUsageFlags::PIXELATE_USAGE_COLOR_ATTACMENT)
+					attachmentBlendStates.push_back(outputs[i].BlendState);
 
 			// Store this in the pipeline state, but override some parts
-			VkPipelineColorBlendStateCreateInfo colorBlending =
-			{
-				.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-				.logicOpEnable = VK_FALSE,
-				.attachmentCount = 1,
-				.pAttachments = &colorBlendAttachment,
-			};
+			auto colorBlending = pipelineDescriptor.ColorBlendingState;
+			colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+			colorBlending.attachmentCount = attachmentBlendStates.size();
+			colorBlending.pAttachments = attachmentBlendStates.data();
 
-			return std::make_tuple(colorBlending, std::vector<VkPipelineColorBlendAttachmentState>{ colorBlendAttachment });
+			return std::make_tuple(colorBlending, attachmentBlendStates);
+		}
+
+		struct PixelatePipelineRenderingCreateInfo
+		{
+			VkPipelineRenderingCreateInfo PipelineRenderingCreateInfo;
+			std::vector<VkFormat> ColorAttachmentFormats{};
+		};
+
+		static PixelatePipelineRenderingCreateInfo GetPipelineRenderingInfo(const PixelatePass& pass, VkFormat swapchainFormat)
+		{
+
+			PixelatePipelineRenderingCreateInfo createInfo{};
+			createInfo.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+
+			VkFormat format;
+			for (int i = 0; i < pass.Outputs.size(); i++)
+			{
+				if (pass.Outputs[i].Resource.Type == PixelateResourceType::Buffer)
+					continue; // not an attachment
+
+				if ((pass.Flags & PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN)
+					&& (pass.Outputs[i].UsageFlags & PIXELATE_USAGE_COLOR_ATTACMENT))
+					format = swapchainFormat;
+				else
+					format = pass.Outputs[i].Resource.PhysicalImageDescriptor.Format;
+
+				switch (pass.Outputs[i].UsageFlags)
+				{
+				case PixelateResourceUsageFlags::PIXELATE_USAGE_COLOR_ATTACMENT:
+					createInfo.ColorAttachmentFormats.push_back(format);
+					break;
+				case PixelateResourceUsageFlags::PIXELATE_USAGE_DEPTH_ATTACMENT:
+					createInfo.PipelineRenderingCreateInfo.depthAttachmentFormat = format;
+					break;
+				}
+			}
+
+			createInfo.PipelineRenderingCreateInfo.colorAttachmentCount = createInfo.ColorAttachmentFormats.size();
+			createInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = createInfo.ColorAttachmentFormats.data();
+
+			return createInfo;
 		}
 
 		static VkPipeline CreateGraphicsPipeline(
 			VkDevice device,
-			GraphicsPipelineDescriptor& descriptor,
-			VkRenderPass renderPass,
-			uint32_t subpassIndex,
+			const PixelatePass& pass,
 			VkViewport& viewport,
-			VkRect2D& scissor)
+			VkRect2D& scissor,
+			VkFormat swapchainFormat)
 		{
-			return VK_NULL_HANDLE;
-
-			auto shaderStages = GetPipelineShaderStageInfo(device, descriptor);
-			auto pipelineLayout = GetPipelineLayout(device, descriptor);
+			auto shaderStages = GetPipelineShaderStageInfo(device, pass.GraphicsPipelineDescriptor);
+			auto pipelineLayout = GetPipelineLayout(device, pass.GraphicsPipelineDescriptor);
 			
 			VkPipelineVertexInputStateCreateInfo vertexInputInfo =
 			{
 				.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-				.vertexBindingDescriptionCount = (uint32_t)descriptor.VertexInputBindings.size(),
-				.pVertexBindingDescriptions = descriptor.VertexInputBindings.data(),
-				.vertexAttributeDescriptionCount = (uint32_t)descriptor.VertexInputAttributes.size(),
-				.pVertexAttributeDescriptions = descriptor.VertexInputAttributes.data(),
+				.vertexBindingDescriptionCount = (uint32_t)pass.GraphicsPipelineDescriptor.VertexInputBindings.size(),
+				.pVertexBindingDescriptions = pass.GraphicsPipelineDescriptor.VertexInputBindings.data(),
+				.vertexAttributeDescriptionCount = (uint32_t)pass.GraphicsPipelineDescriptor.VertexInputAttributes.size(),
+				.pVertexAttributeDescriptions = pass.GraphicsPipelineDescriptor.VertexInputAttributes.data(),
 			};
 			
 			VkPipelineViewportStateCreateInfo viewportState =
@@ -285,31 +202,34 @@ namespace Pixelate
 				.pScissors = &scissor,
 			};
 			
-			auto [colorBlendState, colorBlendAttachmentState] = GetColorBlendState();
-			
+			auto [colorBlendState, colorBlendAttachmentState] = GetColorBlendState(pass.GraphicsPipelineDescriptor, pass.Outputs);
+
+			auto pipelineRenderingCreateInfo = GetPipelineRenderingInfo(pass, swapchainFormat);
+
 			VkGraphicsPipelineCreateInfo pipelineInfo =
 			{
 				.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-				.stageCount = (uint32_t)shaderStages.size(), // Number of shader stages
+				.pNext = &pipelineRenderingCreateInfo.PipelineRenderingCreateInfo,
+				.stageCount = (uint32_t)shaderStages.size(),
 				.pStages = shaderStages.data(),
 				.pVertexInputState = &vertexInputInfo,
-				.pInputAssemblyState = &descriptor.InputAssemby,
+				.pInputAssemblyState = &pass.GraphicsPipelineDescriptor.InputAssemby,
 				.pViewportState = &viewportState,
-				.pRasterizationState = &descriptor.RasterizationState,
-				.pMultisampleState = &descriptor.MultisamplingState,
-				.pDepthStencilState = &descriptor.DepthStencilState, // Optional, null if not used
+				.pRasterizationState = &pass.GraphicsPipelineDescriptor.RasterizationState,
+				.pMultisampleState = &pass.GraphicsPipelineDescriptor.MultisamplingState,
+				.pDepthStencilState = &pass.GraphicsPipelineDescriptor.DepthStencilState,
 				.pColorBlendState = &colorBlendState,
 				.layout = pipelineLayout,
-				.renderPass = renderPass,
-				.subpass = subpassIndex,
 			};
 			
 			VkPipeline pipeline;
 			auto result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
 			
 			if (result != VK_SUCCESS)
-				PXL8_CORE_ERROR(std::string("Failed to create pipeline for shader: ") + descriptor.Shader);
-			
+				PXL8_CORE_ERROR(std::string("Failed to create pipeline with shader: ") + pass.GraphicsPipelineDescriptor.ShaderDescriptor.Name);
+
+			PXL8_CORE_INFO(std::string("Pipeline created successfully for shader: ") + pass.GraphicsPipelineDescriptor.ShaderDescriptor.Name);
+
 			return pipeline;
 		}
 
@@ -317,19 +237,18 @@ namespace Pixelate
 
 		VkPipeline GetGraphicsPipeline(
 			VkDevice device,
-			GraphicsPipelineDescriptor& descriptor,
-			VkRenderPass renderPass,
-			uint32_t subpassIndex,
+			const PixelatePass& pass,
 			VkViewport viewport,
-			VkRect2D scissor)
+			VkRect2D scissor,
+			VkFormat swapchainFormat)
 		{
-			auto hash = descriptor.Hash();
+			auto hash = pass.GraphicsPipelineDescriptor.Hash();
 
 			auto pipelineSearch = g_Pipelines.find(hash);
 			if (pipelineSearch != g_Pipelines.end())
 				return pipelineSearch->second;
 
-			g_Pipelines.emplace(hash, CreateGraphicsPipeline(device, descriptor, renderPass, subpassIndex, viewport, scissor));
+			g_Pipelines.emplace(hash, CreateGraphicsPipeline(device, pass, viewport, scissor, swapchainFormat));
 			
 			return g_Pipelines.at(hash);
 		}
