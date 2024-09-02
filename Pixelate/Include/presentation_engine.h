@@ -57,10 +57,11 @@ namespace Pixelate
 	public:
 		PixelatePresentationEngine(int width, int height, SDL_Window* window, VkSurfaceKHR surface);
 		void Initialize(PixelateDevice device);
-		std::tuple<uint32_t, VkImageView> AcquireSwapcahinImage(VkSemaphore signalSemaphore = VK_NULL_HANDLE, VkFence signalFence = VK_NULL_HANDLE);
+		uint32_t AcquireSwapcahinImage(VkSemaphore signalSemaphore = VK_NULL_HANDLE, VkFence signalFence = VK_NULL_HANDLE);
 		void Present(
 			uint32_t swapchainImageIndex,
-			PixelateSemaphore waitSemaphore,
+			PixelateSemaphore acquireSwapchainImageSemaphore,
+			PixelateSemaphore swapchainImageReadyToPresentSemaphore,
 			VkImageLayout previousLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 		void Dispose(VkInstance instance);
 
@@ -76,8 +77,10 @@ namespace Pixelate
 	private:
 		void TransitionImageLayout(
 			uint32_t swapchainImageIndex,
-			PixelateSemaphore signalSemaphore,
-			PixelateSemaphore waitSemaphore,
+			VkSemaphoreSubmitInfo* pSignalSemaphore = nullptr,
+			uint32_t signalSemaphoreCount = 0,
+			VkSemaphoreSubmitInfo* pWaitSemaphore = nullptr,
+			uint32_t waitSemaphoreCount = 0,
 			VkImageLayout newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
 			VkImageLayout oldLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 	private:

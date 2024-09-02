@@ -74,7 +74,7 @@ namespace Pixelate
 	{
 		PIXELATE_PASS_NO_FLAG = 0,
 		PIXELATE_PASS_RECORD_ONCE = 1, // only  record the command buffer once; execute every frame
-		PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN = 2,
+		PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN = 2,
 	} PixelatePassFlagBits;
 	typedef size_t PixelatePassFlags;
 

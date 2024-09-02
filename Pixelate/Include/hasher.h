@@ -21,20 +21,20 @@ namespace Pixelate
 
 		void Hash(const uint16_t value)
 		{
-			Hash((char)(value & 01));
-			Hash((char)(value >> 8));
+			Hash(static_cast<char>(value));
+			Hash(static_cast<char>(value >> 8));
 		}
 
 		void Hash(const uint32_t value)
 		{
-			Hash((uint16_t)value);
-			Hash((uint16_t)(value >> 16));
+			Hash(static_cast<uint16_t>(value));
+			Hash(static_cast<uint16_t>(value >> 16));
 		}
 
 		void Hash(const uint64_t value)
 		{
-			Hash((uint32_t)value);
-			Hash((uint32_t)(value >> 32));
+			Hash(static_cast<uint32_t>(value));
+			Hash(static_cast<uint32_t>(value >> 32));
 		}
 
 		void Hash(const char*& string)

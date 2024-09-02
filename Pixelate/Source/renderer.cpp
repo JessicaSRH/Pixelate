@@ -487,15 +487,19 @@ namespace Pixelate
 					m_FrameInFlightIndex,
 				});
 
-			auto [swapchainImageIndex, swapchainImageView] = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
+			auto swapchainImageIndex = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
 
-			renderGraph.Render(m_FrameInFlightIndex, swapchainImageIndex);
-			// record command buffers that render (or copy/blit) to swapchain image
-			// submit command buffers to graphics queue
-				// - assign frame-in-flight fence to be signaled on completion
-				// - assign frame-in-flight semaphore to be signaled on completion
+			auto [fence, swapchainImageReadyToPresentSemaphore] = renderGraph.RecordAndSubmit(
+				m_Device,
+				m_FrameInFlightIndex,
+				swapchainImageIndex,
+				acquireSwapchainImageSemaphore,
+				m_Presentation.GetSwapchain());
 
-			m_Presentation.Present(swapchainImageIndex, acquireSwapchainImageSemaphore);
+			m_Presentation.Present(
+				swapchainImageIndex,
+				acquireSwapchainImageSemaphore,
+				swapchainImageReadyToPresentSemaphore);
 
 			m_FrameInFlightIndex = (m_FrameInFlightIndex + 1) % PixelateSettings::MAX_FRAMES_IN_FLIGHT;
 		}

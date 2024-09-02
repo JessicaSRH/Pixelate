@@ -9,6 +9,7 @@ namespace Pixelate
 	{
 		FrameHasBeenPresented = 1,
 		SwapchainLayoutTransition = 2,
+		RenderGraphQueueSubmit = 4,
 	};
 
 	struct FenceGroupDescriptor

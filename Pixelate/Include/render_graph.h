@@ -3,6 +3,9 @@
 #include "presentation_engine.h"
 #include "pixelate_render_pass.h"
 #include "pipeline_manager.h"
+#include "pixelate_settings.h"
+#include "semaphore_manager.h"
+#include "fence_manager.h"
 
 namespace Pixelate
 {
@@ -22,12 +25,9 @@ namespace Pixelate
 
 	struct PixelateRuntimePass
 	{
-		static constexpr int RenderingInfosCount = 3;// allocate room for up to 3 different render targets
-
 		const char* PassName;
 		PassType PassType;
 		PixelatePassFlags Flags;
-		VkCommandBuffer CommandBuffer;
 		VkDevice Device;
 		VkPipeline Pipeline;
 		union
@@ -35,14 +35,20 @@ namespace Pixelate
 			CommandGraphics CommandBufferGraphics;
 			CommandHost CommandBufferHost;
 		};
-		PixelateRenderingInfo RenderingInfos[RenderingInfosCount];
+		VkCommandBuffer CommandBuffer[PixelateSettings::MAX_FRAMES_IN_FLIGHT];
+		PixelateRenderingInfo RenderingInfos[PixelateSettings::MAX_FRAMES_IN_FLIGHT];
 	};
 
 	class RenderGraph
 	{
 	public:
 		RenderGraph(PixelateDevice device, const RenderGraphDescriptor& descriptor, const PixelateSwapchain& swapchain);
-		void Render(uint32_t frameInFlightIndex, uint32_t swapchainImageIndex) const;
+		std::tuple<FenceGroup, PixelateSemaphore> RecordAndSubmit(
+			PixelateDevice device,
+			uint32_t frameInFlightIndex,
+			uint32_t swapchainImageIndex,
+			PixelateSemaphore acquireSwapchainImageSemaphore,
+			const PixelateSwapchain& swapchain);
 	private:
 		std::vector<PixelateRuntimePass> RuntimePasses;
 

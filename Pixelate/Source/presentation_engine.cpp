@@ -6,6 +6,7 @@
 #include "fence_manager.h"
 #include "command_buffer_manager.h"
 #include "window.h"
+#include "pixelate_settings.h"
 
 namespace Pixelate
 {
@@ -265,12 +266,12 @@ namespace Pixelate
 		m_ImageTransitionCommandBuffers.resize(m_Swapchain.SwapchainImages.size());
 	}
 
-	std::tuple<uint32_t, VkImageView> PixelatePresentationEngine::AcquireSwapcahinImage(VkSemaphore signalSemaphore, VkFence signalFence)
+	uint32_t PixelatePresentationEngine::AcquireSwapcahinImage(VkSemaphore signalSemaphore, VkFence signalFence)
 	{
 		uint32_t imageIndex{};
 		auto result = vkAcquireNextImageKHR(m_Device.VkDevice, m_Swapchain.VkSwapchain, std::numeric_limits<uint64_t>::max(), signalSemaphore, signalFence, &imageIndex);
 
-		return { imageIndex, m_Swapchain.SwapchainImageViews[imageIndex] };
+		return { imageIndex };
 	}
 
 	void ValidateSwapchainResult(VkResult result)
@@ -290,23 +291,13 @@ namespace Pixelate
 
 	void PixelatePresentationEngine::TransitionImageLayout(
 		uint32_t swapchainImageIndex,
-		PixelateSemaphore signalSemaphore,
-		PixelateSemaphore waitSemaphore,
+		VkSemaphoreSubmitInfo* pSignalSemaphore,
+		uint32_t signalSemaphoreCount,
+		VkSemaphoreSubmitInfo* pWaitSemaphore,
+		uint32_t waitSemaphoreCount,
 		VkImageLayout newLayout,
 		VkImageLayout oldLayout)
 	{
-		auto signalSemaphoreSubmitInfo = signalSemaphore.SemaphoreSubmitInfo;
-		auto waitSemaphoreSubmitInfo = waitSemaphore.SemaphoreSubmitInfo;
-		VkSemaphoreSubmitInfo* pWaitSemaphoreSubmitInfo = waitSemaphore.Semaphore == VK_NULL_HANDLE ? nullptr : &waitSemaphoreSubmitInfo;
-
-		auto fenceGroup = FenceManager::GetFenceGroup(
-			m_Device.VkDevice,
-			FenceGroupDescriptor
-			{
-				.Identifier = FenceIdenfitier::SwapchainLayoutTransition,
-				.FenceGroupSize = static_cast<uint32_t>(m_Swapchain.SwapchainImages.size()),
-			});
-
 		// Don't re-record the command buffer, it'll be the same every frame
 		if (m_ImageTransitionCommandBuffers[swapchainImageIndex] == VK_NULL_HANDLE)
 		{
@@ -347,15 +338,16 @@ namespace Pixelate
 			m_Device,
 			GraphicsQueueSubmitDescriptor{ GraphicsQueueType::Default },
 			m_ImageTransitionCommandBuffers[swapchainImageIndex],
-			fenceGroup[swapchainImageIndex],
-			&signalSemaphoreSubmitInfo, 1,
-			pWaitSemaphoreSubmitInfo, pWaitSemaphoreSubmitInfo == nullptr ? 0 : 1
+			VK_NULL_HANDLE,
+			pSignalSemaphore, signalSemaphoreCount,
+			pWaitSemaphore, waitSemaphoreCount
 		);
 	}
 
 	void PixelatePresentationEngine::Present(
 		uint32_t swapchainImageIndex,
-		PixelateSemaphore waitSemaphore,
+		PixelateSemaphore acquireSwapchainImageSemaphore,
+		PixelateSemaphore swapchainImageReadyToPresentSemaphore,
 		VkImageLayout previousLayout)
 	{
 		VkPresentInfoKHR presentInfo{};
@@ -365,9 +357,6 @@ namespace Pixelate
 		presentInfo.pImageIndices = &swapchainImageIndex;
 
 		std::vector<VkSemaphore> waitSemaphores{};
-
-		if (waitSemaphore.Semaphore != VK_NULL_HANDLE)
-			waitSemaphores.push_back(waitSemaphore.Semaphore);
 
 		if (!(previousLayout & (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR | VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR)))
 		{
@@ -379,8 +368,15 @@ namespace Pixelate
 					.Identifier = SemaphoreIdentifier::SwapchainImageTransitionToPresent,
 					.Index = swapchainImageIndex
 				});
+			TransitionImageLayout(
+				swapchainImageIndex,
+				&imageTransitionSemaphore.SemaphoreSubmitInfo, 1,
+				&swapchainImageReadyToPresentSemaphore.SemaphoreSubmitInfo, 1);
 			waitSemaphores.push_back(imageTransitionSemaphore);
-			TransitionImageLayout(swapchainImageIndex, imageTransitionSemaphore, PixelateSemaphore());
+		}
+		else
+		{
+			waitSemaphores.push_back(swapchainImageReadyToPresentSemaphore);
 		}
 
 		presentInfo.waitSemaphoreCount = waitSemaphores.size();

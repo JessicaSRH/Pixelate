@@ -79,7 +79,7 @@ static PixelatePass GetTrianglePass()
 				}
 			}
 			),
-			PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN | PIXELATE_PASS_RECORD_ONCE,
+			PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN | PIXELATE_PASS_RECORD_ONCE,
 			TrianglePassCommandBuffer,
 		{
 			// Inputs if any

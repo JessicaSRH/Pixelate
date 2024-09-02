@@ -1,6 +1,7 @@
 #include "render_graph.h"
 #include "log.h"
 #include "command_buffer_manager.h"
+#include "queue_manager.h"
 
 namespace Pixelate
 {
@@ -11,7 +12,7 @@ namespace Pixelate
 	{
 		PixelateRenderingInfo renderingInfo{};
 
-		if (!(pass.Flags & PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN))
+		if (!(pass.Flags & PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN))
 		{
 			PXL8_CORE_WARN("Non-swapchain render targets are not currently supported! Rendering to swapchain...");
 		}
@@ -24,7 +25,7 @@ namespace Pixelate
 					VkRenderingAttachmentInfo
 					{
 						.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR,
-						.imageView = swapchain.SwapchainImageViews[index], // only support swapchain color attachments for now...
+						.imageView = VK_NULL_HANDLE, // swapchain image views are retrieved at runtime
 						.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 						.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 						.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
@@ -62,28 +63,26 @@ namespace Pixelate
 
 		runtimePass.Pipeline = Pipelines::GetGraphicsPipeline(device.VkDevice, pass, viewport, scissor, swapchain.SurfaceFormat.format);
 
-		//int renderingInfosCount = pass.Flags & PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN
-		//	? swapchain.SwapchainImages.size()
-		//	: PixelateRuntimePass::RenderingInfosCount;
-		int renderingInfosCount = swapchain.SwapchainImages.size(); // remove this line when the above lines are reintroduced
-
-		for (int i = 0; i < renderingInfosCount; i++)
-			runtimePass.RenderingInfos[i] = GetRenderingInfo(pass, i, swapchain);
-
 		runtimePass.PassType = pass.PassType;
 		runtimePass.Device = device.VkDevice;
 		runtimePass.PassName = pass.Name;
 		runtimePass.Flags = pass.Flags;
-		runtimePass.CommandBuffer = CommandBufferManager::GetCommandBuffer(
-			device,
-			CommandBufferDescriptor
-			{
-				.Type = CommandBufferType::GraphicsQueue,
-				.Level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-				.PerformanceProfile = pass.Flags & PIXELATE_PASS_RECORD_ONCE
-					? CommandBufferPerformanceProfile::PersistentResources
-					: CommandBufferPerformanceProfile::Default,
-			});
+
+		for (int i = 0; i < PixelateSettings::MAX_FRAMES_IN_FLIGHT; i++)
+		{
+			runtimePass.CommandBuffer[i] = CommandBufferManager::GetCommandBuffer(
+				device,
+				CommandBufferDescriptor
+				{
+					.Type = CommandBufferType::GraphicsQueue,
+					.Level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+					.PerformanceProfile = pass.Flags & PIXELATE_PASS_RECORD_ONCE
+						? CommandBufferPerformanceProfile::PersistentResources
+						: CommandBufferPerformanceProfile::Default,
+				});
+
+			runtimePass.RenderingInfos[i] = GetRenderingInfo(pass, i, swapchain);
+		}
 
 		switch (pass.PassType)
 		{
@@ -118,32 +117,118 @@ namespace Pixelate
 		}
 	}
 
-	static void RecordGraphicsPass(uint32_t index, const PixelateRuntimePass& runtimePass)
+	static void RecordGraphicsPass(
+		uint32_t frameInFlightIndex,
+		uint32_t swapchainImageIndex,
+		const PixelateSwapchain& swapchain,
+		PixelateRuntimePass& runtimePass)
 	{
-		vkCmdBeginRendering(runtimePass.CommandBuffer, &runtimePass.RenderingInfos[index].RenderingInfo);
+		auto commandBuffer = runtimePass.CommandBuffer[frameInFlightIndex];
 
-		runtimePass.CommandBufferGraphics(runtimePass.CommandBuffer, runtimePass.Pipeline);
+		//VkCommandBufferInheritanceRenderingInfo commandBufferInheritanceRenderingInfo
+		//{
+		//	.sType = ,
+		//	.pNext = ,
+		//	.flags = ,
+		//	.viewMask = ,
+		//	.colorAttachmentCount = ,
+		//	.pColorAttachmentFormats = ,
+		//	.depthAttachmentFormat = ,
+		//	.stencilAttachmentFormat = ,
+		//	.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+		//};
 
-		vkCmdEndRendering(runtimePass.CommandBuffer);
+		//VkCommandBufferInheritanceInfo commandBufferInheritanceInfo
+		//{
+		//	.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+		//	.pNext = &commandBufferInheritanceRenderingInfo,
+		//	.renderPass = VK_NULL_HANDLE,
+		//	.subpass = 0,
+		//	.framebuffer = VK_NULL_HANDLE,
+		//	.occlusionQueryEnable = VK_FALSE,
+		//	.queryFlags = 0,
+		//	.pipelineStatistics = 0,
+		//};
+
+		VkCommandBufferBeginInfo commandBufferBeginInfo
+		{
+			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+			.pNext = nullptr,
+			.flags = 0,
+			.pInheritanceInfo = nullptr, //&commandBufferInheritanceInfo,
+		};
+		vkBeginCommandBuffer(commandBuffer, &commandBufferBeginInfo);
+
+		auto colorAttachmentCount = runtimePass.RenderingInfos[frameInFlightIndex].ColorAttachments.size();
+
+		if (runtimePass.Flags & PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN && colorAttachmentCount == 1)
+		{
+			runtimePass.RenderingInfos[frameInFlightIndex].ColorAttachments[0].imageView = swapchain.SwapchainImageViews[swapchainImageIndex];
+			runtimePass.RenderingInfos[frameInFlightIndex].RenderingInfo.pColorAttachments = runtimePass.RenderingInfos[frameInFlightIndex].ColorAttachments.data();
+		}
+
+		vkCmdBeginRendering(commandBuffer, &runtimePass.RenderingInfos[frameInFlightIndex].RenderingInfo);
+
+		runtimePass.CommandBufferGraphics(commandBuffer, runtimePass.Pipeline);
+
+		vkCmdEndRendering(commandBuffer);
+		vkEndCommandBuffer(commandBuffer);
 	}
 
 	// TODO: add return values:
 	// fences in order
 	// semaphores in order
 	// last swapchain image layout
-	void RenderGraph::Render(uint32_t frameInFlightIndex, uint32_t swapchainImageIndex) const
+	std::tuple<FenceGroup, PixelateSemaphore> RenderGraph::RecordAndSubmit(PixelateDevice device, uint32_t frameInFlightIndex, uint32_t swapchainImageIndex, PixelateSemaphore acquireSwapchainImageSemaphore, const PixelateSwapchain& swapchain)
 	{
+		auto queueSubmitFences = FenceManager::GetFenceGroup(
+			device.VkDevice,
+			FenceGroupDescriptor
+			{
+				.Identifier = FenceIdenfitier::RenderGraphQueueSubmit,
+				.FenceGroupSize = static_cast<uint32_t>(RuntimePasses.size())
+			});
 
-		//for (const auto& runtimePass : RuntimePasses)
-		//{
-		//	uint32_t index = runtimePass.Flags & PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN
-		//		? swapchainImageIndex
-		//		: frameInFlightIndex;
+		auto swapchainImageReadyToPresentSemaphore = SemaphoreManager::GetSemaphore(
+			device.VkDevice,
+			VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+			SemaphoreDescriptor{
+				SemaphoreIdentifier::SwapchainImageReadyToPresent,
+				frameInFlightIndex,
+			});
 
-		//	RecordGraphicsPass(index, runtimePass); // TODO: Check if the pass is record-once, and figure out how to statetrack that shit
+		// Find the last operation in the render graph that outputs a swapchain image
+		int lastSwapchainOperationIndex = 0;
+		for (int i = 0; i < RuntimePasses.size(); i++)
+			if (RuntimePasses[i].Flags & PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN)
+				lastSwapchainOperationIndex = i;
 
-		//}
+		for (int i = 0; i < RuntimePasses.size(); i++)
+		{
+			auto& runtimePass = RuntimePasses[i];
 
+			auto signalSemaphore = lastSwapchainOperationIndex == i ? &swapchainImageReadyToPresentSemaphore.SemaphoreSubmitInfo : nullptr;
+			uint32_t signalSemaphoreCount = lastSwapchainOperationIndex == i;
+
+			switch (runtimePass.PassType)
+			{
+			case PassType::Graphics:
+				RecordGraphicsPass(frameInFlightIndex, swapchainImageIndex, swapchain, runtimePass); // TODO: Check if the pass is flagged with "record-once", and statetrack that shit
+
+				QueueManager::GraphicsQueueSubmit(
+					device,
+					GraphicsQueueSubmitDescriptor(),
+					runtimePass.CommandBuffer[frameInFlightIndex],
+					queueSubmitFences[i],
+					signalSemaphore, signalSemaphoreCount,
+					&acquireSwapchainImageSemaphore.SemaphoreSubmitInfo, 1);
+				
+				break;
+				//TODO: implement other pass types
+			}
+		}
+
+		return std::make_tuple(queueSubmitFences, swapchainImageReadyToPresentSemaphore);
 	}
 }
 

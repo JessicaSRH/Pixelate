@@ -42,7 +42,7 @@ namespace Pixelate
 		void Dispose(VkDevice device)
 		{
 			for (const auto& [hash, pixelateSemaphore] : m_SemaphoreGroups)
-					vkDestroySemaphore(device, pixelateSemaphore.Semaphore, nullptr);
+					vkDestroySemaphore(device, pixelateSemaphore.VkSempahore, nullptr);
 		}
 
 		std::vector<VkSemaphoreSubmitInfo> GetSemaphoreSubmitInfo(PixelateSemaphore semaphore)
@@ -63,13 +63,13 @@ namespace Pixelate
 	}
 
 	PixelateSemaphore::PixelateSemaphore(VkSemaphore semaphore, VkPipelineStageFlags2 stageMask) :
-		Semaphore(semaphore),
+		VkSempahore(semaphore),
 		StageMask(stageMask),
 		SemaphoreSubmitInfo(VkSemaphoreSubmitInfo
 			{
 				VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO,
 				nullptr,
-				Semaphore,
+				VkSempahore,
 				0,
 				StageMask,
 				0b1
@@ -79,6 +79,6 @@ namespace Pixelate
 
 	PixelateSemaphore::operator VkSemaphore()
 	{
-		return Semaphore;
+		return VkSempahore;
 	}
 }

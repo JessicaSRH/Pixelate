@@ -30,7 +30,7 @@ namespace Pixelate
 	namespace QueueManager
 	{
 		void GraphicsQueueSubmit(
-			PixelateDevice& device,
+			PixelateDevice device,
 			GraphicsQueueSubmitDescriptor descriptor,
 			VkCommandBuffer commandBuffer,
 			VkFence signalFence,
@@ -40,7 +40,7 @@ namespace Pixelate
 			uint32_t waitSemaphoreCount);
 
 		void GraphicsQueueSubmit(
-			PixelateDevice& device,
+			PixelateDevice device,
 			GraphicsQueueSubmitDescriptor descriptor,
 			std::vector<VkCommandBuffer> commandBuffers,
 			VkFence signalFence,

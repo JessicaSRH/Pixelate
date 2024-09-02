@@ -151,7 +151,7 @@ namespace Pixelate
 				if (pass.Outputs[i].Resource.Type == PixelateResourceType::Buffer)
 					continue; // not an attachment
 
-				if ((pass.Flags & PIXELATE_PASS_COLOR_ATTACHMENT_IS_SWAPCHAIN)
+				if ((pass.Flags & PIXELATE_PASS_COLOR_OUTPUT_TO_SWAPCHAIN)
 					&& (pass.Outputs[i].UsageFlags & PIXELATE_USAGE_COLOR_ATTACMENT))
 					format = swapchainFormat;
 				else

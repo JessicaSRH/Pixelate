@@ -8,6 +8,7 @@ namespace Pixelate
 	{
 		SwapchainImageHasBeenAcquired = 1,
 		SwapchainImageTransitionToPresent = 2,
+		SwapchainImageReadyToPresent = 4,
 	};
 
 	struct SemaphoreDescriptor
@@ -18,12 +19,12 @@ namespace Pixelate
 		uint64_t Hash() const;
 	};
 
-	class PixelateSemaphore
+	struct PixelateSemaphore
 	{
 	public:
 		PixelateSemaphore(VkSemaphore semaphore = VK_NULL_HANDLE, VkPipelineStageFlags2 stageMask = VK_PIPELINE_STAGE_2_NONE);
 
-		VkSemaphore Semaphore;
+		VkSemaphore VkSempahore;
 		VkPipelineStageFlags2 StageMask;
 		VkSemaphoreSubmitInfo SemaphoreSubmitInfo;
 		operator VkSemaphore();
