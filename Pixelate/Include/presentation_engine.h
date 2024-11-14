@@ -60,8 +60,9 @@ namespace Pixelate
 		uint32_t AcquireSwapcahinImage(VkSemaphore signalSemaphore = VK_NULL_HANDLE, VkFence signalFence = VK_NULL_HANDLE);
 		void Present(
 			uint32_t swapchainImageIndex,
-			PixelateSemaphore acquireSwapchainImageSemaphore,
-			PixelateSemaphore swapchainImageReadyToPresentSemaphore,
+			VkSemaphoreSubmitInfo* pWaitSemaphore,
+			uint32_t waitSemaphoreCount,
+			//PixelateSemaphore swapchainImageReadyToPresentSemaphore,
 			VkImageLayout previousLayout = VK_IMAGE_LAYOUT_UNDEFINED);
 		void Dispose(VkInstance instance);
 

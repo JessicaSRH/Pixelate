@@ -29,7 +29,7 @@ namespace Pixelate
 						.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 						.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
 						.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-						.clearValue = { .color = { 0.0f, 0.0f, 0.0f, 1.0f } },
+						.clearValue = { .color = { 1.0f, 0.0f, 1.0f, 1.0f } },
 					});
 			}
 		}
@@ -179,7 +179,13 @@ namespace Pixelate
 	// fences in order
 	// semaphores in order
 	// last swapchain image layout
-	std::tuple<FenceGroup, PixelateSemaphore> RenderGraph::RecordAndSubmit(PixelateDevice device, uint32_t frameInFlightIndex, uint32_t swapchainImageIndex, PixelateSemaphore acquireSwapchainImageSemaphore, const PixelateSwapchain& swapchain)
+	std::tuple<FenceGroup, PixelateSemaphore> RenderGraph::RecordAndSubmit(
+		PixelateDevice device,
+		uint32_t frameInFlightIndex,
+		uint32_t swapchainImageIndex,
+		VkSemaphoreSubmitInfo* pWaitSemaphores,
+		uint32_t waitSemaphoreCount,
+		const PixelateSwapchain& swapchain)
 	{
 		auto queueSubmitFences = FenceManager::GetFenceGroup(
 			device.VkDevice,
@@ -221,7 +227,7 @@ namespace Pixelate
 					runtimePass.CommandBuffer[frameInFlightIndex],
 					queueSubmitFences[i],
 					signalSemaphore, signalSemaphoreCount,
-					&acquireSwapchainImageSemaphore.SemaphoreSubmitInfo, 1);
+					pWaitSemaphores, waitSemaphoreCount);
 				
 				break;
 				//TODO: implement other pass types

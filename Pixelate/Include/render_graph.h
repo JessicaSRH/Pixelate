@@ -47,7 +47,8 @@ namespace Pixelate
 			PixelateDevice device,
 			uint32_t frameInFlightIndex,
 			uint32_t swapchainImageIndex,
-			PixelateSemaphore acquireSwapchainImageSemaphore,
+			VkSemaphoreSubmitInfo* pWaitSemaphores,
+			uint32_t waitSemaphoreCount,
 			const PixelateSwapchain& swapchain);
 	private:
 		std::vector<PixelateRuntimePass> RuntimePasses;

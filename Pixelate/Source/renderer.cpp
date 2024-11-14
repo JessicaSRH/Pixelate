@@ -468,7 +468,7 @@ namespace Pixelate
 		{
 			quit = inputHandler();
 
-			auto presentationFences = FenceManager::GetFenceGroup(
+			auto frameInFlightFences = FenceManager::GetFenceGroup(
 				m_Device.VkDevice,
 				FenceGroupDescriptor
 				{
@@ -477,7 +477,7 @@ namespace Pixelate
 					.CreateFlags = VK_FENCE_CREATE_SIGNALED_BIT
 				});
 
-			presentationFences.Wait(m_FrameInFlightIndex);
+			frameInFlightFences.Wait(m_FrameInFlightIndex);
 
 			auto acquireSwapchainImageSemaphore = SemaphoreManager::GetSemaphore(
 				m_Device.VkDevice,
@@ -487,19 +487,22 @@ namespace Pixelate
 					m_FrameInFlightIndex,
 				});
 
+			// -------------------------------------------------------
+			// TODO: FIGURE OUT WHY swapchainImageIndex is always 0!!!
 			auto swapchainImageIndex = m_Presentation.AcquireSwapcahinImage(acquireSwapchainImageSemaphore);
+			//--------------------------------------------------------
 
 			auto [fence, swapchainImageReadyToPresentSemaphore] = renderGraph.RecordAndSubmit(
 				m_Device,
 				m_FrameInFlightIndex,
 				swapchainImageIndex,
-				acquireSwapchainImageSemaphore,
+				&acquireSwapchainImageSemaphore.SemaphoreSubmitInfo, 1,
 				m_Presentation.GetSwapchain());
 
 			m_Presentation.Present(
 				swapchainImageIndex,
-				acquireSwapchainImageSemaphore,
-				swapchainImageReadyToPresentSemaphore);
+				&swapchainImageReadyToPresentSemaphore.SemaphoreSubmitInfo, 1
+			);
 
 			m_FrameInFlightIndex = (m_FrameInFlightIndex + 1) % PixelateSettings::MAX_FRAMES_IN_FLIGHT;
 		}

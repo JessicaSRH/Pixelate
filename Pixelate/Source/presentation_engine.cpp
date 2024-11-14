@@ -268,10 +268,18 @@ namespace Pixelate
 
 	uint32_t PixelatePresentationEngine::AcquireSwapcahinImage(VkSemaphore signalSemaphore, VkFence signalFence)
 	{
-		uint32_t imageIndex{};
-		auto result = vkAcquireNextImageKHR(m_Device.VkDevice, m_Swapchain.VkSwapchain, std::numeric_limits<uint64_t>::max(), signalSemaphore, signalFence, &imageIndex);
+		vkDeviceWaitIdle(m_Device.VkDevice);
 
-		return { imageIndex };
+		uint32_t imageIndex = std::numeric_limits<uint32_t>::max();
+		auto result = vkAcquireNextImageKHR(
+			m_Device.VkDevice,
+			m_Swapchain.VkSwapchain,
+			std::numeric_limits<uint64_t>::max(),
+			signalSemaphore,
+			signalFence,
+			&imageIndex);
+
+		return imageIndex;
 	}
 
 	void ValidateSwapchainResult(VkResult result)
@@ -346,8 +354,8 @@ namespace Pixelate
 
 	void PixelatePresentationEngine::Present(
 		uint32_t swapchainImageIndex,
-		PixelateSemaphore acquireSwapchainImageSemaphore,
-		PixelateSemaphore swapchainImageReadyToPresentSemaphore,
+		VkSemaphoreSubmitInfo* pWaitSemaphore,
+		uint32_t waitSemaphoreCount,
 		VkImageLayout previousLayout)
 	{
 		VkPresentInfoKHR presentInfo{};
@@ -358,8 +366,8 @@ namespace Pixelate
 
 		std::vector<VkSemaphore> waitSemaphores{};
 
-		if (!(previousLayout & (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR | VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR)))
-		{
+		//if (!(previousLayout & (VK_IMAGE_LAYOUT_PRESENT_SRC_KHR | VK_IMAGE_LAYOUT_SHARED_PRESENT_KHR)))
+		//{
 			auto& imageTransitionSemaphore = SemaphoreManager::GetSemaphore(
 				m_Device.VkDevice,
 				VK_PIPELINE_STAGE_2_ALL_GRAPHICS_BIT,
@@ -368,16 +376,18 @@ namespace Pixelate
 					.Identifier = SemaphoreIdentifier::SwapchainImageTransitionToPresent,
 					.Index = swapchainImageIndex
 				});
+
 			TransitionImageLayout(
 				swapchainImageIndex,
 				&imageTransitionSemaphore.SemaphoreSubmitInfo, 1,
-				&swapchainImageReadyToPresentSemaphore.SemaphoreSubmitInfo, 1);
+				0, 0);
+
 			waitSemaphores.push_back(imageTransitionSemaphore);
-		}
-		else
-		{
-			waitSemaphores.push_back(swapchainImageReadyToPresentSemaphore);
-		}
+		//}
+		//else
+		//{
+			//waitSemaphores.push_back(acquireSwapchainImageSemaphore);
+		//}
 
 		presentInfo.waitSemaphoreCount = waitSemaphores.size();
 		presentInfo.pWaitSemaphores = waitSemaphores.data();
